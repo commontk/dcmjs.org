@@ -2,6 +2,13 @@ var dcmjs = dcmjs || {};
 dcmjs.utils = dcmjs.utils || {};
 
 /*
+  Execute DCMTK program
+*/
+dcmjs.utils.execute = function(prog, arguments) {
+  return Module.callMain([prog].concat(arguments));
+}
+
+/*
   Read the file and invoke processor function
 */
 dcmjs.utils.readFile = function(file, processor) {

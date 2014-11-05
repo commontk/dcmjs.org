@@ -94,7 +94,7 @@ $(function() {
     FS.writeFile(uploadedFilePath, uploadedObject, {encoding: "binary"});
 
     // perform the xml dump
-    file.name, Module.callMain(['dcm2xml', '--load-all', '--encode-base64', '--write-binary-data', uploadedFilePath, xmlFilePath]);
+    file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', uploadedFilePath, xmlFilePath]);
     if (!fileExists(xmlFilePath)) {
       print ('skipping non-DICOM file because no xml generated for ' + file.name);
       finalizeFile(file);
@@ -147,7 +147,7 @@ $(function() {
 
 
     // perform the xml undump
-    Module.callMain(['xml2dcm', organizedXMLFilePath, organizedDICOMFilePath]);
+    dcmjs.utils.execute('xml2dcm', [organizedXMLFilePath, organizedDICOMFilePath]);
     var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
     print(instanceFilePath + "  of size " + organizedObject.length);
@@ -156,7 +156,7 @@ $(function() {
     if (false) {
 
       // debug download code
-      Module.callMain(['dcmdump', organizedDICOMFilePath]);
+      dcmjs.utils.execute('dcmdump', [organizedDICOMFilePath]);
 
 
       var blob = new Blob([organizedObject], {type: 'application/dicom'});
