@@ -24,7 +24,7 @@ $(function() {
     FS.writeFile(fileName, content, {encoding: "binary"});
 
     $('#main_content').append('<p class="output">Dumping...</p>');
-    Module.callMain(['dcmdump', fileName]);
+    dcmjs.utils.execute('dcmdump', [fileName]);
   }
 
   var readSelectedFiles = function(files) {
