@@ -2,6 +2,25 @@ var dcmjs = dcmjs || {};
 dcmjs.utils = dcmjs.utils || {};
 
 /*
+  Emscripten namespace
+*/
+var Module = Module || {};
+
+/*
+  Convenience function loading dcmjs.js asynchronously
+*/
+dcmjs.utils.initialize = function() {
+
+  if (typeof Pace != 'undefined') {
+    Pace.on("done", function(){
+      $('#main_content').show(0);
+    });
+  }
+
+  $.getScript("../javascripts/libs/dcmjs.js");
+}
+
+/*
   Execute DCMTK program
 */
 dcmjs.utils.execute = function(prog, arguments) {
