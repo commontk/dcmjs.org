@@ -7,12 +7,16 @@
     <link rel="stylesheet" type="text/css" href="../stylesheets/stylesheet.css" media="screen" />
     <link rel="stylesheet" type="text/css" href="../stylesheets/pygment_trac.css" media="screen" />
 
+    <script src="../javascripts/libs/pace.js"></script>
+    <link rel="stylesheet" type="text/css" href="../stylesheets/pace-theme-loading-bar.css" media="screen" />
+
     <script src="../javascripts/libs/jquery-1.10.2.js"></script>
-    <script src="../javascripts/libs/dcmjs.js"></script>
     <script src="../javascripts/utils.js"></script>
 
     <script>
 $(function() {
+
+  dcmjs.utils.initialize();
 
   var dcm2pnm = function(reader, file) {
     var fileName = file.name;
@@ -160,7 +164,7 @@ $(function() {
 </header>
 
 <div class="container">
-  <section id="main_content">
+  <section id="main_content" style="display:none;">
 
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
