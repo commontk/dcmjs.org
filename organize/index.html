@@ -1,0 +1,324 @@
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="../stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="../stylesheets/pygment_trac.css" media="screen" />
+
+    <script src="../javascripts/libs/pace.js"></script>
+    <link rel="stylesheet" type="text/css" href="../stylesheets/pace-theme-loading-bar.css" media="screen" />
+
+    <script src="../javascripts/libs/jquery-1.10.2.js"></script>
+    <script src="../javascripts/libs/jszip.min.js"></script>
+    <script src="../javascripts/libs/FileSaver.min.js"></script>
+    <script src="../javascripts/utils.js"></script>
+
+<script>
+
+
+$(function() {
+
+  dcmjs.utils.initialize();
+
+  // the current pending set of files, as in what was
+  // dropped or selected by the user (the input)
+  var fileSet = new Set();
+
+  // a zip object in which to place the organized
+  // DICOM data (the output)
+  var zip = new JSZip();
+
+  // utility: todo: keep a log for optional download
+  var print = function(s) {
+    console.log(s);
+    $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
+  };
+
+  // utility: check path in virtual fs
+  var fileExists = function(filePath) {
+      try {
+        FS.stat(filePath);
+      }
+      catch(e) {
+        if (e.code !== 'ENOENT') {
+          print(e);
+        }
+        return false;
+      }
+      return true;
+  }
+
+  // utility: remove files in a file list (if they exist)
+  var deleteFiles = function(filePaths) {
+    $.each(filePaths, function(index,filePath) {
+      try {
+        FS.unlink(filePath);
+      }
+      catch(e) {
+        if (e.code !== 'ENOENT') {
+          print(e);
+        }
+      }
+    });
+  }
+
+  // adds contents to zip object at specified path.
+  // removes file from input set.
+  // triggers zip creation and download when set is empty.
+  var finalizeFile = function(file, path, contents) {
+    fileSet.delete(file);
+    print('file set size: ' + fileSet.size);
+    if (path) {
+      zipContents = new Uint8Array(contents);
+      print('adding ' + path + "  of size " + zipContents.length);
+      zip.file(path, zipContents, {binary: true});
+    }
+    if (fileSet.size === 0) {
+      var content = zip.generate({type:"blob"});
+      // see FileSaver.js
+      saveAs(content, "organizedDICOM.zip");
+    }
+  }
+
+
+  // process one file from the input set.
+  var organize = function(reader, file) {
+    var fileName = file.name;
+    var uploadedFilePath = '/uploadedFile.dcm';
+    var xmlFilePath = '/uploadedFile.xml';
+    var organizedXMLFilePath = '/organizedObject.xml';
+    var organizedDICOMFilePath = '/organizedObject.dcm';
+
+    // Delete anything left from previous runs
+    deleteFiles([uploadedFilePath, xmlFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
+
+    print('Writing...');
+    var uploadedObject = new Int8Array(reader.result);
+    FS.writeFile(uploadedFilePath, uploadedObject, {encoding: "binary"});
+
+    // perform the xml dump
+    file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', uploadedFilePath, xmlFilePath]);
+    if (!fileExists(xmlFilePath)) {
+      print ('skipping non-DICOM file because no xml generated for ' + file.name);
+      finalizeFile(file);
+      return;
+    }
+    var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
+
+    // create the jquery dom of the dicom object
+    var dicomDOM = $.parseXML(xmlString);
+    var $dicomDOM = $(dicomDOM);
+
+    // manipulate the dom
+    print(file.name);
+    print($dicomDOM.find('[name=SOPInstanceUID]').text());
+    print($dicomDOM.find('[name=PatientName]').text());
+    print($dicomDOM.find('[name=SeriesInstanceUID]').text());
+    $dicomDOM.find('[name=PatientName]').text("Nobody you would know");
+    window.$dicomDOM = $dicomDOM;
+
+    // write the new xml and covert it to dicom
+    var organizedObject = (new XMLSerializer()).serializeToString($dicomDOM[0]);
+    FS.writeFile(organizedXMLFilePath, organizedObject);
+
+    // make a clean study path based on the contents of the file
+    var names = [ 'PatientName',
+                  'Modality',
+                  'StudyDescription',
+                  'StudyDate',
+                  'SeriesNumber',
+                  'SeriesDescription',
+                  'InstanceNumber'];
+    var valuesByName = {};
+
+    // replace spaces with underscores and other special chars with %xx uri code
+    var findSpaces = new RegExp(' ', 'g');
+    $.each(names, function (index, name) {
+      var value = $dicomDOM.find('[name='+name+']').text();
+      value = value.replace(findSpaces, '_');
+      valuesByName[name] = encodeURIComponent(value);
+    })
+
+    var studyPath = '/' + valuesByName['PatientName'] + '-' +
+                   valuesByName['Modality'] + '-' +
+                   valuesByName['StudyID'] + '_' +
+                   valuesByName['StudyDescription'] + '-' +
+                   valuesByName['StudyDate'];
+    var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
+                       valuesByName['SeriesDescription'] + '-' +
+                       valuesByName['InstanceNumber'] + '.dcm';
+
+
+    // perform the xml undump
+    dcmjs.utils.execute('xml2dcm', [organizedXMLFilePath, organizedDICOMFilePath]);
+    var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
+
+    print(instanceFilePath + "  of size " + organizedObject.length);
+    finalizeFile(file, instanceFilePath, organizedObject);
+
+    if (false) {
+
+      // debug download code
+      dcmjs.utils.execute('dcmdump', [organizedDICOMFilePath]);
+
+
+      var blob = new Blob([organizedObject], {type: 'application/dicom'});
+      saveAs(blob, "organized.dcm");
+    }
+
+
+  }
+
+  // Used for file selection button or drop of file list
+  var readSelectedFiles = function(files) {
+    $.each(files, function(index,file) {
+      fileSet.add(file);
+      dcmjs.utils.readFile(file, organize);
+    });
+  }
+
+
+  function fsErrorHandler(e) {
+      console.log('FileSystem API error code: ' + e.name);
+      console.log(e);
+  }
+
+  // File selector
+  function handleFileSelect(e) {
+    evt = e.originalEvent
+    var files = evt.target.files; // FileList object
+    readSelectedFiles(files);
+  }
+
+  // Recursive directory read, callback per File
+  function readEntry(entry,callback) {
+    if (entry.isFile) {
+      print(entry.fullPath);
+      if (entry.name.indexOf('.') === 0) {
+        print('ignoring ', entry.fullPath);
+      }
+      entry.file(callback, fsErrorHandler);
+    } else {
+      if (entry.createReader) {
+        var directoryReader = entry.createReader();
+        var entryHandler = function (results) {
+          if (results.length) {
+            $.each(results, function(index, entry) {
+              readEntry(entry,callback);
+            });
+            directoryReader.readEntries(entryHandler, fsErrorHandler);
+          }
+        };
+        directoryReader.readEntries(entryHandler, fsErrorHandler);
+      }
+    }
+  }
+
+  // Setup the file selector listener
+  $('#fileSelector').bind('change', handleFileSelect)
+
+  // Drag and Drop
+  function handleFileDrop(e) {
+    var evt = e.originalEvent;
+    evt.stopPropagation();
+    evt.preventDefault();
+
+    // Clean up any previous output
+    $('#main_content p.output').remove();
+
+    // handle the items or files
+    var length = evt.dataTransfer.items.length;
+    if (length > -1) {
+      // chrome-only transfer that can include dropped directories
+      for (var i = 0; i < length; i++) {
+        var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
+        readEntry(entry, function(file) {
+          fileSet.add(file);
+          dcmjs.utils.readFile(file, organize);
+        });
+      }
+    } else {
+      // compatible file-based selection
+      var files = evt.dataTransfer.files; // FileList object
+      readSelectedFiles(files);
+    }
+  }
+
+  // Setup the dnd listeners
+  function ignoreDrag(e) {
+    e.originalEvent.stopPropagation();
+    e.originalEvent.preventDefault();
+    e.originalEvent.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
+  }
+  $('#fileDropZone').bind('dragenter', ignoreDrag).bind('dragover', ignoreDrag).bind('drop', handleFileDrop);
+
+  //  Override print so dcmjs commands will print to web page
+  var printToMainContext = function(s) {
+    $('#main_content').append('<p class="output">' + s + '</p>');
+  };
+  Module.print = printToMainContext;
+
+
+});
+
+</script>
+
+    <title>dcmjs by commontk</title>
+  </head>
+
+  <body>
+
+<header>
+  <div class="container">
+    <h1>dcmjs organize</h1>
+    <h2>Organize and anonymize dicom files in your browser (they are not sent to a server)</h2>
+
+    <h2>NOTE: this is still a work in progress and is not yet ready for routine use!</h2>
+  </div>
+</header>
+
+
+
+<!--
+Main interface for data upload
+-->
+<div class="container">
+  <section id="main_content" style="display:none;">
+
+    <!-- File selector -->
+    <p>Browse for DICOM files:</p>
+    <input type="file" id="fileSelector" name="selectorFiles[]" multiple />
+
+    <p>Or</p>
+
+    <!-- Drag and Drop -->
+    <div class="files_wrapper">
+      <div class="area_file" id="fileDropZone">Drop your DICOM files here</div>
+    </div>
+
+    <output id="fileListProperties"></output>
+
+    <p class='output'>Waiting...</p>
+
+    <div id='viewContainer'></div>
+
+  </section>
+</div>
+
+
+
+<!-- google analytics -->
+<script type="text/javascript">
+  var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+  document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+  try {
+    var pageTracker = _gat._getTracker("UA-50750505-1");
+  pageTracker._trackPageview();
+  } catch(err) {}
+</script>
+
+  </body>
+</html>
