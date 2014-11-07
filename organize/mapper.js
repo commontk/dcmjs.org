@@ -34,7 +34,7 @@ var getSpecificReplacer = function(parser) {
 
 
 // (parser is created once per run)
-var getParser = function($oldDicomDom, mapping) {
+var getParser = function($oldDicomDom, mapping, filePath, options) {
     return {
         getMapTable: function(matchValue, matchIndex, newIndex) {
             // var mapping = list of lists read from mappingFilePath
@@ -45,8 +45,13 @@ var getParser = function($oldDicomDom, mapping) {
                 return mapRow[0][newIndex];
             }
             else {
-                throw("No value '" + matchValue +
-                    "' found in mapping table column " + matchIndex);
+                // TODO: create a downloadable log
+                var issue = ("No value '" + matchValue +
+                      "' found in mapping table column " + matchIndex);
+                options.print(issue);
+                if (options.requireMapping) {
+                  throw(issue);
+                }
             }
         },
         getFilePath: function(filePath) {
@@ -166,11 +171,13 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
 // in main func:
 // read from old dicom dom and write to new dicomdom
 // FIXME: filePath, mapFile
-var mapDom = function(xmlString, filePath, mapFile) {
+var mapDom = function(xmlString, filePath, mapFile, options) {
+    options = options || {};
+    if (!options.requireMapping) options.requireMapping = false;
     var $oldDicomDOM = $($.parseXML(xmlString));
     var $newDicomDOM = $($.parseXML(xmlString));
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath);
+    var parser = getParser($oldDicomDOM, mappingTable, filePath, options);
     var specificReplace = getSpecificReplacer(parser);
     // deal with dicoms
     Object.keys(specificReplace.dicom).forEach(function(name) {

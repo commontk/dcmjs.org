@@ -118,7 +118,7 @@ $(function() {
     // - pass filePath from closure
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     var filepath, mapFile;
-    var $newDicomDOM = mapDom(xmlString, filepath, mapFile);
+    var $newDicomDOM = mapDom(xmlString, filepath, mapFile, {print: print});
 
     // manipulate the dom
     print(file.name);
