@@ -149,8 +149,10 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
     unlessSpecified(defaultEmpty).forEach(function(name) {
         tagEmpty($newDicomDOM, name);
     });
-    unlessSpecified(replaceUIDs).forEach(function(uid) {
-        tagReplace($newDicomDOM, uid, hashUID(uid));
+    unlessSpecified(replaceUIDs).forEach(function(uidName) {
+        // this is counterintuitive but getDicom already hashes UIDs, so
+        // just get the value and replace the existing one
+        tagReplace($newDicomDOM, uidName, parser.getDicom(uidName));
     });
     // last, a few special cases
     // FIXME:
