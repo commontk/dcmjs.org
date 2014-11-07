@@ -13,7 +13,9 @@
     <script src="../javascripts/libs/jszip.min.js"></script>
     <script src="../javascripts/libs/FileSaver.min.js"></script>
     <script src="../javascripts/utils.js"></script>
-
+    <script src="sha1.js"></script>
+    <script src="mapdefaults.js"></script>
+    <script src="mapper.js"></script>
 <script>
 
 
@@ -47,7 +49,7 @@ $(function() {
         return false;
       }
       return true;
-  }
+  };
 
   // utility: remove files in a file list (if they exist)
   var deleteFiles = function(filePaths) {
@@ -61,7 +63,7 @@ $(function() {
         }
       }
     });
-  }
+  };
 
   // adds contents to zip object at specified path.
   // removes file from input set.
@@ -79,7 +81,7 @@ $(function() {
       // see FileSaver.js
       saveAs(content, "organizedDICOM.zip");
     }
-  }
+  };
 
 
   // process one file from the input set.
@@ -107,19 +109,23 @@ $(function() {
     var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
 
     // create the jquery dom of the dicom object
-    var dicomDOM = $.parseXML(xmlString);
-    var $dicomDOM = $(dicomDOM);
+    // now in mapDom
+    // var dicomDOM = $.parseXML(xmlString);
+    // var $dicomDOM = $(dicomDOM);
+    // read from old, write to new
+
+    // TODO:
+    // - pass filePath from closure
+    // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
+    var filepath, mapFile;
+    var $newDicomDOM = mapDom(xmlString, filepath, mapFile);
 
     // manipulate the dom
     print(file.name);
-    print($dicomDOM.find('[name=SOPInstanceUID]').text());
-    print($dicomDOM.find('[name=PatientName]').text());
-    print($dicomDOM.find('[name=SeriesInstanceUID]').text());
-    $dicomDOM.find('[name=PatientName]').text("Nobody you would know");
-    window.$dicomDOM = $dicomDOM;
+    window.$newDicomDOM = $newDicomDOM;
 
     // write the new xml and covert it to dicom
-    var organizedObject = (new XMLSerializer()).serializeToString($dicomDOM[0]);
+    var organizedObject = (new XMLSerializer()).serializeToString($newDicomDOM[0]);
     FS.writeFile(organizedXMLFilePath, organizedObject);
 
     // make a clean study path based on the contents of the file
@@ -135,12 +141,12 @@ $(function() {
     // replace spaces with underscores and other special chars with %xx uri code
     var findSpaces = new RegExp(' ', 'g');
     $.each(names, function (index, name) {
-      var value = $dicomDOM.find('[name='+name+']').text();
+      var value = $newDicomDOM.find('[name='+name+']').text();
       value = value.replace(findSpaces, '_');
       valuesByName[name] = encodeURIComponent(value);
-    })
+    });
 
-    var studyPath = '/' + valuesByName['PatientName'] + '-' +
+    var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
                    valuesByName['Modality'] + '-' +
                    valuesByName['StudyID'] + '_' +
                    valuesByName['StudyDescription'] + '-' +
