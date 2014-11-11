@@ -174,18 +174,25 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
 var mapDom = function(xmlString, filePath, mapFile, options) {
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
+
+    // make a DOM to query and a DOM to update
     var $oldDicomDOM = $($.parseXML(xmlString));
     var $newDicomDOM = $($.parseXML(xmlString));
+
     // TODO: define filePath - should come in arguments
     var parser = getParser($oldDicomDOM, mappingTable, filePath, options);
     var specificReplace = getSpecificReplacer(parser);
+
     // deal with dicoms
     Object.keys(specificReplace.dicom).forEach(function(name) {
         tagReplace($newDicomDOM, name, specificReplace.dicom[name]());
     });
+
     Object.keys(specificReplace.filePath).forEach(function(name) {
         // TODO
     });
+
     applyReplaceDefaults($newDicomDOM, specificReplace, parser);
+
     return $newDicomDOM;
 };
