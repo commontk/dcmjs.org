@@ -121,11 +121,18 @@ $(function() {
         if (vr === '??') { vr = "UN"; }
         if (line.search('(no value available)') != -1) {
           len = 0;
-        }
-        var openBracket = line.indexOf('[');
-        var closeBracket = line.lastIndexOf(']');
-        if (openBracket > 0 && closeBracket > 0) {
-          value = line.substring(openBracket+1, closeBracket);
+        } else {
+        // adding else so non-bracketed values don't return invalid data
+          var openBracket = line.indexOf('[');
+          var closeBracket = line.lastIndexOf(']');
+          if (openBracket > 0 && closeBracket > 0) {
+            value = line.substring(openBracket+1, closeBracket);
+          }
+          else {
+            // assuming US, UL which are not bracketed
+            // TODO(@Steve): review whether in line with overall implementation
+            value = parts[2];
+          }
         }
 
         xml += '<element tag="' + tag + '" ';
@@ -178,15 +185,6 @@ $(function() {
       var privateTag = (Number("0x"+tag[3]) % 2 === 1);
       // TODO: move pixel data handling to the mapper
       var pixelData = (tag === "7fe0,0010");
-
-      // debug
-      // FIXME: the mapper currently removes things in the tagNamesToAlwaysKeep table
-      if (tag === "0028,0010") { value = "256"; }
-      if (tag === "0028,0011") { value = "256"; }
-      if (tag === "0028,0100") { value = "16"; }
-      if (tag === "0028,0101") { value = "16"; }
-      if (tag === "0028,0105") { value = "15"; }
-      if (tag === "0028,0103") { value = "1"; }
 
       if (!privateTag) {
         if (pixelData) {
