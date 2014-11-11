@@ -24,7 +24,20 @@ dcmjs.utils.initialize = function() {
   Execute DCMTK program
 */
 dcmjs.utils.execute = function(prog, arguments) {
+
+  /*
   return Module.callMain([prog].concat(arguments));
+  */
+
+  var exit_orig = Module.exit;
+  var exitCode;
+  Module.exit = function(status) {
+    exitCode = status;
+    exit_orig(status);
+  }
+  Module.callMain([prog].concat(arguments));
+  Module.exit = exit_orig;
+  return exitCode;
 }
 
 /*
