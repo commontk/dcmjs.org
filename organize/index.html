@@ -65,6 +65,142 @@ $(function() {
     });
   };
 
+  // returns xml string
+  var xmlFromDICOM_dcm2xml = function(file, filePath) {
+    var xmlFilePath = '/uploadedFile.xml';
+
+    // perform the xml dump
+    file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', filePath, xmlFilePath]);
+    file.name, dcmjs.utils.execute('dcm2xml', [filePath, xmlFilePath]);
+    if (!fileExists(xmlFilePath)) {
+      print ('skipping non-DICOM file because no xml generated for ' + file.name);
+      finalizeFile(file);
+      return;
+    }
+    var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
+    deleteFiles([xmlFilePath]);
+    return xmlString;
+  }
+
+  // returns xml string from dump string
+  var dumpToXML = function(dumpLines) {
+    var xml = '';
+    xml += '<?xml version="1.0" encoding="ISO-8859-1"?>\n';
+    xml += '<file-format>\n';
+    xml += '<meta-header xfer="1.2.840.10008.1.2.1" name="Little Endian Explicit">\n';
+
+    $.each(dumpLines, function (index, line) {
+
+  if (line.search("PixelData") !== -1) {
+    console.log(line);
+  }
+
+      line = line.trim();
+      if (line.length === 0) { return; };
+      if (line.search('Unknown Tag & Data') != -1) {
+        // TODO: better way to handle unknown private data?
+        return;
+      }
+      line = line.replace('&', '&amp');
+      if (line.search('# Dicom-Data-Set') != -1) {
+        xml += '</meta-header>\n';
+        xml += '<data-set xfer="1.2.840.10008.1.2" name="Little Endian Implicit">\n';
+        return;
+      }
+      if (line[0] === '#') { return; };
+      if (line[0] === '(') {
+        var parts = line.split(' ');
+        var tag = parts[0].substring(1,10);
+        var vr = parts[1];
+        var vm = parts[parts.length-2];
+        var len = parts[parts.length-3];
+        len = len.substring(0,len.length-1);
+        var name = parts[parts.length-1];
+
+        var value = '';
+        if (vr === '??') { vr = "UN"; }
+        if (line.search('(no value available)') != -1) {
+          len = 0;
+        }
+        var openBracket = line.indexOf('[');
+        var closeBracket = line.lastIndexOf(']');
+        if (openBracket > 0 && closeBracket > 0) {
+          value = line.substring(openBracket+1, closeBracket);
+        }
+
+        xml += '<element tag="' + tag + '" ';
+        xml += 'vr="' + vr + '" ';
+        xml += 'vm="' + vm + '" ';
+        xml += 'len="' + len + '" ';
+        xml += 'name="' + name + '">';
+        xml += value + '</element>\n';
+    }
+    });
+
+    xml += '</data-set>\n';
+    xml += '</file-format>\n';
+
+    return(xml);
+  }
+
+  // returns xml string
+  var xmlFromDICOM = function(file, filePath) {
+    var dumpPath = '/uploadedFile.txt';
+
+    // create a dump file
+    // - a <fileName>.0.raw file will be created in .
+    var dumpLines = [];
+    Module.print = function(s) { dumpLines.push(s) }
+    var returnCode = dcmjs.utils.execute('dcmdump', ['--print-all', '--write-pixel', '.', '--no-uid-names', filePath]);
+    Module.print = print;
+
+    print('returnCode', returnCode); // TODO
+
+    var rawFilePath = filePath + ".0.raw";
+    if (!fileExists(rawFilePath)) {
+      print ('skipping non-DICOM file because no raw file generated for ' + file.name);
+      finalizeFile(file);
+      return;
+    }
+
+    return (dumpToXML(dumpLines));
+  }
+
+  // converts a jquery dom object into a
+  // string in dcmdump format.
+  var dicomDOMToDump = function($dicomDOM) {
+    var dump = '';
+    $dicomDOM.find('data-set').find("element").each(function() {
+      var tag = this.getAttribute('tag');
+      var vr = this.getAttribute('vr');
+      var value = this.innerHTML;
+      // TODO: move private tag handling to the mapper
+      var privateTag = (Number("0x"+tag[3]) % 2 === 1);
+      // TODO: move pixel data handling to the mapper
+      var pixelData = (tag === "7fe0,0010");
+
+      // debug
+      // FIXME: the mapper currently removes things in the tagNamesToAlwaysKeep table
+      if (tag === "0028,0010") { value = "256"; }
+      if (tag === "0028,0011") { value = "256"; }
+      if (tag === "0028,0100") { value = "16"; }
+      if (tag === "0028,0101") { value = "16"; }
+      if (tag === "0028,0105") { value = "15"; }
+      if (tag === "0028,0103") { value = "1"; }
+
+      if (!privateTag) {
+        if (pixelData) {
+          // FIXME: special case based on known file names
+          dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
+        } else {
+          dump += '(' + tag + ') ' + vr + ' [' + value + ']\n';
+        }
+      }
+    });
+    console.log(dump);
+    return(dump);
+  };
+
   // adds contents to zip object at specified path.
   // removes file from input set.
   // triggers zip creation and download when set is empty.
@@ -88,31 +224,17 @@ $(function() {
   var organize = function(reader, file) {
     var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
-    var xmlFilePath = '/uploadedFile.xml';
     var organizedXMLFilePath = '/organizedObject.xml';
     var organizedDICOMFilePath = '/organizedObject.dcm';
 
     // Delete anything left from previous runs
-    deleteFiles([uploadedFilePath, xmlFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
+    deleteFiles([uploadedFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
 
     print('Writing...');
     var uploadedObject = new Int8Array(reader.result);
     FS.writeFile(uploadedFilePath, uploadedObject, {encoding: "binary"});
 
-    // perform the xml dump
-    file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', uploadedFilePath, xmlFilePath]);
-    if (!fileExists(xmlFilePath)) {
-      print ('skipping non-DICOM file because no xml generated for ' + file.name);
-      finalizeFile(file);
-      return;
-    }
-    var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
-
-    // create the jquery dom of the dicom object
-    // now in mapDom
-    // var dicomDOM = $.parseXML(xmlString);
-    // var $dicomDOM = $(dicomDOM);
-    // read from old, write to new
+    var xmlString = xmlFromDICOM(file, uploadedFilePath);
 
     // TODO:
     // - pass filePath from closure
@@ -123,6 +245,8 @@ $(function() {
     // manipulate the dom
     print(file.name);
     window.$newDicomDOM = $newDicomDOM;
+
+
 
     // write the new xml and covert it to dicom
     var organizedObject = (new XMLSerializer()).serializeToString($newDicomDOM[0]);
@@ -155,9 +279,17 @@ $(function() {
                        valuesByName['SeriesDescription'] + '-' +
                        valuesByName['InstanceNumber'] + '.dcm';
 
-
+    // old way:
     // perform the xml undump
-    dcmjs.utils.execute('xml2dcm', [organizedXMLFilePath, organizedDICOMFilePath]);
+    /////dcmjs.utils.execute('xml2dcm', [organizedXMLFilePath, organizedDICOMFilePath]);
+
+
+    // conver to dump and save
+    var dump = dicomDOMToDump($newDicomDOM);
+    FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
+
+    // perform the dump to dcm
+    dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
     var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
     print(instanceFilePath + "  of size " + organizedObject.length);
@@ -166,11 +298,16 @@ $(function() {
     if (false) {
 
       // debug download code
+      print("dumping");
+      var dump = "";
+      Module.print = function(s) { dump += s; }
       dcmjs.utils.execute('dcmdump', [organizedDICOMFilePath]);
+      Module.print = print;
+      print(dump);
 
 
-      var blob = new Blob([organizedObject], {type: 'application/dicom'});
-      saveAs(blob, "organized.dcm");
+      // var blob = new Blob([organizedObject], {type: 'application/dicom'});
+      // saveAs(blob, "organized.dcm");
     }
 
 
@@ -203,6 +340,7 @@ $(function() {
       print(entry.fullPath);
       if (entry.name.indexOf('.') === 0) {
         print('ignoring ', entry.fullPath);
+        return;
       }
       entry.file(callback, fsErrorHandler);
     } else {
