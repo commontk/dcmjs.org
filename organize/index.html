@@ -66,6 +66,7 @@ $(function() {
   };
 
   // returns xml string
+  // currently unused as it also encodes pixels -> performance
   var xmlFromDICOM_dcm2xml = function(file, filePath) {
     var xmlFilePath = '/uploadedFile.xml';
 
@@ -80,7 +81,10 @@ $(function() {
     var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
     deleteFiles([xmlFilePath]);
     return xmlString;
-  }
+  };
+
+  // FIXME: to be confirmed - any others? is SL correct here?
+  var nonBracketDumpedVRs = ['US', 'UL', 'SL'];
 
   // returns xml string from dump string
   var dumpToXML = function(dumpLines) {
@@ -129,8 +133,8 @@ $(function() {
             value = line.substring(openBracket+1, closeBracket);
           }
           else {
-            // assuming US, UL which are not bracketed
-            // TODO(@Steve): review whether in line with overall implementation
+            // assuming US, UL, (SL) which are not bracketed
+            // TODO: should we check VRs and throw error otherwise?
             value = parts[2];
           }
         }
@@ -148,7 +152,7 @@ $(function() {
     xml += '</file-format>\n';
 
     return(xml);
-  }
+  };
 
   // returns xml string
   var xmlFromDICOM = function(file, filePath) {
@@ -157,7 +161,7 @@ $(function() {
     // create a dump file
     // - a <fileName>.0.raw file will be created in .
     var dumpLines = [];
-    Module.print = function(s) { dumpLines.push(s) }
+    Module.print = function(s) { dumpLines.push(s); };
     var returnCode = dcmjs.utils.execute('dcmdump', ['--print-all', '--write-pixel', '.', '--no-uid-names', filePath]);
     Module.print = print;
 
@@ -171,7 +175,7 @@ $(function() {
     }
 
     return (dumpToXML(dumpLines));
-  }
+  };
 
   // converts a jquery dom object into a
   // string in dcmdump format.
@@ -191,7 +195,8 @@ $(function() {
           // FIXME: special case based on known file names
           dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
         } else {
-          dump += '(' + tag + ') ' + vr + ' [' + value + ']\n';
+          var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
+          dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
         }
       }
     });
