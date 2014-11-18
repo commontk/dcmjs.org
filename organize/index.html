@@ -84,7 +84,7 @@ $(function() {
   };
 
   // FIXME: to be confirmed - any others? is SL correct here?
-  var nonBracketDumpedVRs = ['US', 'UL', 'SL'];
+  var nonBracketDumpedVRs = ['US', 'UL', 'SS', 'SL', 'FL', 'FD', 'OB', 'OF', 'OW', ];
 
   // returns xml string from dump string
   var dumpToXML = function(dumpLines) {
@@ -94,27 +94,27 @@ $(function() {
     xml += '<meta-header xfer="1.2.840.10008.1.2.1" name="Little Endian Explicit">\n';
 
     $.each(dumpLines, function (index, line) {
-
-  if (line.search("PixelData") !== -1) {
-    console.log(line);
-  }
-
-      line = line.trim();
-      if (line.length === 0) { return; };
+      // map to xml depending on the syntax of dcmdump
+      // TODO: this could be improved with a dedicated dcmtk utility
+      line = line.trim();  // remove spaces (indent)
+      if (line.length === 0) { return; }; // skip blank lines
       if (line.search('Unknown Tag & Data') != -1) {
+        // skip privates
         // TODO: better way to handle unknown private data?
         return;
       }
-      line = line.replace('&', '&amp');
+      line = line.replace('&', '&amp'); // escape special characters
       if (line.search('# Dicom-Data-Set') != -1) {
+        // special flag for start of dataset
         xml += '</meta-header>\n';
         xml += '<data-set xfer="1.2.840.10008.1.2" name="Little Endian Implicit">\n';
         return;
       }
-      if (line[0] === '#') { return; };
+      if (line[0] === '#') { return; }; // skip comments
       if (line[0] === '(') {
+        // parse components of a real entry
         var parts = line.split(' ');
-        var tag = parts[0].substring(1,10);
+        var tag = parts[0].substring(1,10); // first "(gggg,eeee)"
         var vr = parts[1];
         var vm = parts[parts.length-2];
         var len = parts[parts.length-3];
@@ -124,18 +124,24 @@ $(function() {
         var value = '';
         if (vr === '??') { vr = "UN"; }
         if (line.search('(no value available)') != -1) {
+          // handle empty tags
+          len = 0;
+        } else if (vr === 'SQ' || vr === 'na') {
+          // handle sequences and items
           len = 0;
         } else {
-        // adding else so non-bracketed values don't return invalid data
+          // look for standard data values in square brackets
           var openBracket = line.indexOf('[');
           var closeBracket = line.lastIndexOf(']');
           if (openBracket > 0 && closeBracket > 0) {
             value = line.substring(openBracket+1, closeBracket);
-          }
-          else {
+          } else {
             // assuming US, UL, (SL) which are not bracketed
-            // TODO: should we check VRs and throw error otherwise?
             value = parts[2];
+            if (nonBracketDumpedVRs.indexOf(vr) < 0) {
+              console.log('Non-bracketed value, line is:');
+              console.log(line);
+            }
           }
         }
 
