@@ -1,6 +1,10 @@
 var dcmjs = dcmjs || {};
 dcmjs.utils = dcmjs.utils || {};
 
+//
+///  Emscripten Related
+//
+
 /*
   Emscripten namespace
 */
@@ -19,6 +23,43 @@ dcmjs.utils.initialize = function() {
 
   $.getScript("../javascripts/libs/dcmjs.js");
 }
+
+//
+///  Emscripten FS Related
+//
+
+// utility: check path in virtual fs
+dcmjs.utils.fileExists = function(filePath) {
+    try {
+      FS.stat(filePath);
+    }
+    catch(e) {
+      if (e.code !== 'ENOENT') {
+        print(e);
+      }
+      return false;
+    }
+    return true;
+};
+
+// utility: remove files in a file list (if they exist)
+dcmjs.utils.deleteFiles = function(filePaths) {
+  $.each(filePaths, function(index,filePath) {
+    try {
+      FS.unlink(filePath);
+    }
+    catch(e) {
+      if (e.code !== 'ENOENT') {
+        print(e);
+      }
+    }
+  });
+};
+
+
+//
+///  DCMTK Related
+//
 
 /*
   Execute DCMTK program
@@ -54,6 +95,10 @@ dcmjs.utils.readFile = function(file, processor) {
   // Read in the image file
   reader.readAsArrayBuffer(file);
 }
+
+//
+///  Browser File Related
+//
 
 dcmjs.utils.displayFileProperties = function(files) {
   // files is a FileList of File objects. List some properties.
