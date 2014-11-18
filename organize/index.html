@@ -206,7 +206,6 @@ $(function() {
         }
       }
     });
-    console.log(dump);
     return(dump);
   };
 
@@ -233,11 +232,12 @@ $(function() {
   var organize = function(reader, file) {
     var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
+    var rawFilePath = uploadedFilePath + '.0.raw';
     var organizedXMLFilePath = '/organizedObject.xml';
     var organizedDICOMFilePath = '/organizedObject.dcm';
 
     // Delete anything left from previous runs
-    deleteFiles([uploadedFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
+    deleteFiles([uploadedFilePath, rawFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
 
     print('Writing...');
     var uploadedObject = new Int8Array(reader.result);
