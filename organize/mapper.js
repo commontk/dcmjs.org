@@ -5,11 +5,14 @@
 // - optional selector to remove everything that's not in tagNamesToAlwaysKeep (mapdefaults.js)
 //   (these tags are defined, but no logic exists yet)
 // - verify hashUID function
+// - pass filepaths
+// - pass a mapfile
+
 
 // example setup
 var mappingTable = [
-    ['anonymous', 'hey I mapped you'],
-    ['', 'this was empty before']
+    ['anonymous', 'mappedname', 1],
+    ['', 'wasempty', 5]
 ];
 
 // from mapdefaults.js
@@ -19,11 +22,17 @@ var replaceUIDs = instanceUIDs;
 var getSpecificReplacer = function(parser) {
     return {
         dicom: {
+            // just set a date
             'PatientID': function() {
-                return "Mr X.";
+                return "newID";
             },
+            // this example replaces the patient name per mapping table columns 0 (original) and 1 (target)
             'PatientName': function() {
                 return parser.getMapTable(parser.getDicom('PatientName'), 0, 1);
+            },
+            // this example finds the patientname in mapping table column 0 and offsets the date by days per column 2
+            'StudyDate': function() {
+                return addDays(parser.getDicom('StudyDate'), parser.getMapTable(parser.getDicom('PatientName'), 0, 2));
             }
         },
         filePath: {
@@ -69,19 +78,17 @@ var getParser = function($oldDicomDom, mapping, filePath, options) {
     };
 };
 
-var specificReplace = {
-    dicom: {
-        'PatientName': function() {
-            return "Mr X.";
-        },
-        'PatientID': function() {
-            return parsers.mapTable(parsers.dicom('PatientID'), 0, 1);
-        }
-    },
-    filePath: {
-        // TODO
-    }
-};
+
+function addDays(dcmDate, numDays) {
+    // just to make sure
+    dcmDate = String(dcmDate);
+    // month is 0 based!
+    var origDate = new Date(dcmDate.substring(0,4), dcmDate.substring(4, 6) - 1, dcmDate.substring(6, 8));
+    var newDate = new Date(origDate);
+    newDate.setDate(newDate.getDate() + numDays);
+    return newDate.getFullYear() + ('0' + String(parseInt(newDate.getMonth(), 10) + 1)).slice(-2) + ('0' + newDate.getDate()).slice(-2);
+}
+
 
 // tag manipulation functions
 // empty if present
