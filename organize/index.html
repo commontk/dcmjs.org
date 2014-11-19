@@ -294,10 +294,19 @@ $(function() {
       console.log(e);
   }
 
+  function cleanupBeforeProcessing() {
+    // Clean up any previous output
+    $('#main_content p.output').remove();
+    // Create a new zip archive
+    zip = new JSZip();
+  }
+
+
   // File selector
   function handleFileSelect(e) {
     evt = e.originalEvent
     var files = evt.target.files; // FileList object
+    cleanupBeforeProcessing();
     readSelectedFiles(files);
   }
 
@@ -339,8 +348,7 @@ $(function() {
     evt.stopPropagation();
     evt.preventDefault();
 
-    // Clean up any previous output
-    $('#main_content p.output').remove();
+    cleanupBeforeProcessing();
 
     // handle the items or files
     var length = evt.dataTransfer.items.length;
@@ -374,8 +382,6 @@ $(function() {
     $('#main_content').append('<p class="output">' + s + '</p>');
   };
   Module.print = printToMainContext;
-
-
 });
 
 </script>
