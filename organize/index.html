@@ -21,7 +21,11 @@
 
 $(function() {
 
+  // sets up the environment to do dicom processing
   dcmjs.utils.initialize();
+
+
+  /// globals
 
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
@@ -31,6 +35,7 @@ $(function() {
   // DICOM data (the output)
   var zip = new JSZip();
 
+
   // utility: todo: keep a log for optional download
   var print = function(s) {
     console.log(s);
@@ -38,7 +43,7 @@ $(function() {
   };
 
   // returns xml string
-  // currently unused as it also encodes pixels -> performance
+  // currently unused as it also encodes pixels as ascii -> performance is bad
   var xmlFromDICOM_dcm2xml = function(file, filePath) {
     var xmlFilePath = '/uploadedFile.xml';
 
@@ -58,7 +63,7 @@ $(function() {
   // FIXME: to be confirmed - any others? is SL correct here?
   var nonBracketDumpedVRs = ['US', 'UL', 'SS', 'SL', 'FL', 'FD', 'OB', 'OF', 'OW', ];
 
-  // returns xml string from dump string
+  // returns xml string from dcmdump output string
   var dumpToXML = function(dumpLines) {
     var xml = '';
     xml += '<?xml version="1.0" encoding="ISO-8859-1"?>\n';
@@ -137,7 +142,8 @@ $(function() {
     var dumpPath = '/uploadedFile.txt';
 
     // create a dump file
-    // - a <fileName>.0.raw file will be created in .
+    // - a <fileName>.0.raw file will be created in ./
+    // override 'print' to capture output in dumpLines
     var dumpLines = [];
     Module.print = function(s) { dumpLines.push(s); };
     var returnCode = dcmjs.utils.execute('dcmdump', ['--print-all', '--write-pixel', '.', '--no-uid-names', filePath]);
@@ -148,7 +154,7 @@ $(function() {
     var rawFilePath = filePath + ".0.raw";
     if (!dcmjs.utils.fileExists(rawFilePath)) {
       print ('skipping non-DICOM file because no raw file generated for ' + file.name);
-      finalizeFile(file);
+      finalizeFile(file); // this assumes access to global function (TODO: could be passed error cb)
       return;
     }
 
@@ -218,7 +224,6 @@ $(function() {
     var xmlString = xmlFromDICOM(file, uploadedFilePath);
 
     // TODO:
-    // - pass filePath from closure
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     var filepath, mapFile;
     var $newDicomDOM = mapDom(xmlString, filepath, mapFile, {print: print});
@@ -226,8 +231,6 @@ $(function() {
     // manipulate the dom
     print(file.name);
     window.$newDicomDOM = $newDicomDOM;
-
-
 
     // write the new xml and covert it to dicom
     var organizedObject = (new XMLSerializer()).serializeToString($newDicomDOM[0]);
@@ -275,23 +278,6 @@ $(function() {
 
     print(instanceFilePath + "  of size " + organizedObject.length);
     finalizeFile(file, instanceFilePath, organizedObject);
-
-    if (false) {
-
-      // debug download code
-      print("dumping");
-      var dump = "";
-      Module.print = function(s) { dump += s; }
-      dcmjs.utils.execute('dcmdump', [organizedDICOMFilePath]);
-      Module.print = print;
-      print(dump);
-
-
-      // var blob = new Blob([organizedObject], {type: 'application/dicom'});
-      // saveAs(blob, "organized.dcm");
-    }
-
-
   }
 
   // Used for file selection button or drop of file list
@@ -317,18 +303,19 @@ $(function() {
 
   // Recursive directory read, callback per File
   function readEntry(entry,callback) {
+    if (entry.name[0] === '.') {
+      print('ignoring hidden file/directory: ', entry.fullPath);
+      return;
+    }
     function fileCallback(file) {
       callback(file, entry.fullPath);
     }
     if (entry.isFile) {
       print(entry.fullPath);
-      if (entry.name.indexOf('.') === 0) {
-        print('ignoring ', entry.fullPath);
-        return;
-      }
       entry.file(fileCallback, fsErrorHandler);
     } else {
       if (entry.createReader) {
+        // recursive - call itself on each entry in the directory
         var directoryReader = entry.createReader();
         var entryHandler = function (results) {
           if (results.length) {
