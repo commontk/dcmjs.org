@@ -317,13 +317,16 @@ $(function() {
 
   // Recursive directory read, callback per File
   function readEntry(entry,callback) {
+    function fileCallback(file) {
+      callback(file, entry.fullPath);
+    }
     if (entry.isFile) {
       print(entry.fullPath);
       if (entry.name.indexOf('.') === 0) {
         print('ignoring ', entry.fullPath);
         return;
       }
-      entry.file(callback, fsErrorHandler);
+      entry.file(fileCallback, fsErrorHandler);
     } else {
       if (entry.createReader) {
         var directoryReader = entry.createReader();
@@ -358,7 +361,8 @@ $(function() {
       // chrome-only transfer that can include dropped directories
       for (var i = 0; i < length; i++) {
         var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
-        readEntry(entry, function(file) {
+        readEntry(entry, function(file, fullPath) {
+          console.log("full path: %s", fullPath);
           fileSet.add(file);
           dcmjs.utils.readFile(file, organize);
         });
