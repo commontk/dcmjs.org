@@ -207,7 +207,7 @@ $(function() {
 
 
   // process one file from the input set.
-  var organize = function(reader, file) {
+  var organize = function(reader, file, filePath) {
     var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
     var rawFilePath = uploadedFilePath + '.0.raw';
@@ -225,8 +225,8 @@ $(function() {
 
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
-    var filepath, mapFile;
-    var $newDicomDOM = mapDom(xmlString, filepath, mapFile, {print: print});
+    var mapFile;
+    var $newDicomDOM = mapDom(xmlString, filePath, mapFile, {print: print});
 
     // manipulate the dom
     print(file.name);
@@ -316,12 +316,11 @@ $(function() {
       print('ignoring hidden file/directory: ', entry.fullPath);
       return;
     }
-    function fileCallback(file) {
-      callback(file, entry.fullPath);
-    }
     if (entry.isFile) {
       print(entry.fullPath);
-      entry.file(fileCallback, fsErrorHandler);
+      entry.file(function(file) {
+        callback(file, entry.fullPath);
+      }, fsErrorHandler);
     } else {
       if (entry.createReader) {
         // recursive - call itself on each entry in the directory
@@ -357,9 +356,10 @@ $(function() {
       for (var i = 0; i < length; i++) {
         var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
         readEntry(entry, function(file, fullPath) {
-          console.log("full path: %s", fullPath);
           fileSet.add(file);
-          dcmjs.utils.readFile(file, organize);
+          dcmjs.utils.readFile(file, function(reader, file) {
+            organize(reader, file, fullPath);
+          });
         });
       }
     } else {
