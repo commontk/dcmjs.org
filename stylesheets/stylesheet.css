@@ -277,3 +277,21 @@ a {
 .cf {
   zoom:1;
 }
+
+/* progress bar - from http://workshop.rs/2012/12/animated-progress-bar-in-4-lines-of-jquery/ */
+.progressBar {
+        width: 400px;
+        height: 22px;
+        border: 1px solid #111;
+        background-color: #292929;
+}
+ 
+.progressBar div {
+        height: 100%;
+        color: #fff;
+        text-align: right;
+        line-height: 22px; /* same as #progressBar height if we want text middle aligned */
+        width: 0;
+        background-color: #0099ff;
+}
+

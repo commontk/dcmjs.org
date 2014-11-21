@@ -5,14 +5,17 @@
 
     <link rel="stylesheet" type="text/css" href="../stylesheets/stylesheet.css" media="screen" />
     <link rel="stylesheet" type="text/css" href="../stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="../stylesheets/ui.jqgrid.css" media="screen" />
 
     <script src="../javascripts/libs/pace.js"></script>
     <link rel="stylesheet" type="text/css" href="../stylesheets/pace-theme-loading-bar.css" media="screen" />
 
-    <script src="../javascripts/libs/jquery-1.10.2.js"></script>
+    <script src="../javascripts/libs/jquery-1.11.0.min.js"></script>
     <script src="../javascripts/libs/jszip.min.js"></script>
     <script src="../javascripts/libs/FileSaver.min.js"></script>
+    <script src="../javascripts/libs/jquery.jqGrid.min.js"></script>
     <script src="../javascripts/utils.js"></script>
+
     <script src="sha1.js"></script>
     <script src="mapdefaults.js"></script>
     <script src="mapper.js"></script>
@@ -30,6 +33,8 @@ $(function() {
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
   var fileSet = new Set();
+  var fileSetMaxSize = 0;
+  var filesByPath = {};
 
   // a zip object in which to place the organized
   // DICOM data (the output)
@@ -191,8 +196,10 @@ $(function() {
   // removes file from input set.
   // triggers zip creation and download when set is empty.
   var finalizeFile = function(file, path, contents) {
+    $('#status').text('Processed ' + file.name + ' to ' + path);
     fileSet.delete(file);
-    print('file set size: ' + fileSet.size);
+    var percent = (100. * (fileSetMaxSize - fileSet.size)) / fileSetMaxSize;
+    progress(percent, $('#processingProgressBar'));
     if (path) {
       zipContents = new Uint8Array(contents);
       print('adding ' + path + "  of size " + zipContents.length);
@@ -299,6 +306,8 @@ $(function() {
     $('#main_content p.output').remove();
     // Create a new zip archive
     zip = new JSZip();
+    fileSetMaxSize = 0;
+    progress(0, $('#processingProgressBar'));
   }
 
 
@@ -338,6 +347,15 @@ $(function() {
       }
     }
   }
+  
+  function progress(percent, $element) {
+      var progressBarWidth = percent * $element.width() / 100;
+      $element.find('div').animate({ width: progressBarWidth }, 50).html(percent + "%&nbsp;");
+  }
+
+  function processFiles() {
+    alert('processing...');
+  }
 
   // Setup the file selector listener
   $('#fileSelector').bind('change', handleFileSelect)
@@ -357,9 +375,10 @@ $(function() {
       for (var i = 0; i < length; i++) {
         var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
         readEntry(entry, function(file, fullPath) {
-          console.log("full path: %s", fullPath);
           fileSet.add(file);
-          dcmjs.utils.readFile(file, organize);
+          filesByPath[fullPath] = file;
+          fileSetMaxSize = fileSet.size;
+          $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
         });
       }
     } else {
@@ -376,6 +395,36 @@ $(function() {
     e.originalEvent.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
   }
   $('#fileDropZone').bind('dragenter', ignoreDrag).bind('dragover', ignoreDrag).bind('drop', handleFileDrop);
+
+  // Set up the table of files to process
+  $("#droppedFileList").jqGrid({
+      datatype: "local",
+      width: 400,
+      colNames:['Files',],
+      colModel:[ {name:'path', index:'path', width:400}, ],
+  });
+
+
+  // button to do the actual processing
+  $("#processFiles").click(function(){
+    cleanupBeforeProcessing();
+    var fileGrid = JSON.parse($('#droppedFileList').jqGrid('jqGridExport', {exptype: 'jsonstring'}));
+    console.log(fileGrid);
+    var gridRows = fileGrid.grid.data;
+    console.log(gridRows);
+    var processingGenerator = (function(gridRows) {
+      return function() {
+        var gridRow = gridRows.pop();
+        if (gridRow && gridRow.path) {
+          printToMainContext(gridRow.path); // TODO: make this perform the operation
+          dcmjs.utils.readFile(filesByPath[gridRow.path], organize);  // TODO: keep track of files and file entries
+          setTimeout(processingGenerator, 5);
+        }
+      };
+    })(gridRows);
+    processingGenerator();
+  });
+
 
   //  Override print so dcmjs commands will print to web page
   var printToMainContext = function(s) {
@@ -416,12 +465,20 @@ Main interface for data upload
 
     <!-- Drag and Drop -->
     <div class="files_wrapper">
-      <div class="area_file" id="fileDropZone">Drop your DICOM files here</div>
+      <div class="area_file" id="fileDropZone">Drop your DICOM files here
+        <div class="fileList" id="droppedFileArea">
+          <table id="droppedFileList"></table>
+          <div id="droppedFilePager"></div>
+        </div>
+      </div>
+      <input type="BUTTON" id="processFiles" value="Process Files" />
     </div>
 
-    <output id="fileListProperties"></output>
+    <div id="processingProgressBar" class="progressBar"><div></div></div>
 
-    <p class='output'>Waiting...</p>
+    <p id='status'>Waiting...</p>
+
+    <p class='output'></p>
 
     <div id='viewContainer'></div>
 
