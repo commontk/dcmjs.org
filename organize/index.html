@@ -232,8 +232,16 @@ $(function() {
 
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
+    // - take requireMapping from UI (skip non-mapping files vs cancel)
     var mapFile;
-    var $newDicomDOM = mapDom(xmlString, filePath, mapFile, {print: print});
+    var result = mapDom(xmlString, filePath, mapFile, {print: print, requireMapping: false});
+    var $newDicomDOM = result.dicom;
+    // new information available here:
+    // result.status.mapFailed = true or undefined.
+    // result.filePath (new file path - TODO)
+    // result.zipFileName (TODO)
+
+
 
     // manipulate the dom
     print(file.name);

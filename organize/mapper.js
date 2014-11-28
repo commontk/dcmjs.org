@@ -19,6 +19,7 @@ var mappingTable = [
 var defaultEmpty = tagNamesToEmpty;
 var replaceUIDs = instanceUIDs;
 
+// TODO: extract specific instructions from UI
 var getSpecificReplacer = function(parser) {
     return {
         dicom: {
@@ -28,11 +29,11 @@ var getSpecificReplacer = function(parser) {
             },
             // this example replaces the patient name per mapping table columns 0 (original) and 1 (target)
             'PatientName': function() {
-                return parser.getMapTable(parser.getDicom('PatientName'), 0, 1);
+                return parser.getMapped(parser.getDicom('PatientName'), 0, 1);
             },
             // this example finds the patientname in mapping table column 0 and offsets the date by days per column 2
             'StudyDate': function() {
-                return addDays(parser.getDicom('StudyDate'), parser.getMapTable(parser.getDicom('PatientName'), 0, 2));
+                return addDays(parser.getDicom('StudyDate'), parser.getMapped(parser.getDicom('PatientName'), 0, 2));
             }
         },
         filePath: {
@@ -43,17 +44,17 @@ var getSpecificReplacer = function(parser) {
 
 
 // (parser is created once per run)
-var getParser = function($oldDicomDom, mapping, filePath, options) {
+// TODO: var mapTable = list of lists read from mappingFilePath
+var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
     return {
-        getMapTable: function(matchValue, matchIndex, newIndex) {
-            // var mapping = list of lists read from mappingFilePath
-            var mapRow = mapping.filter(function(row) {
+        getMapped: function(matchValue, matchIndex, newIndex) {
+            var mapRow = mapTable.filter(function(row) {
                 return row[matchIndex] === matchValue;
             });
             if (mapRow.length) {
                 return mapRow[0][newIndex];
-            }
-            else {
+            } else {
+                status.mapFailed = true;
                 // TODO: create a downloadable log
                 var issue = ("No value '" + matchValue +
                       "' found in mapping table column " + matchIndex);
@@ -158,12 +159,17 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
             return !(tag in specificReplace.dicom);
         });
     }
+    // empty all tags in defaultEmpty, unless there's a specific instruction
+    // to do something else
     unlessSpecified(defaultEmpty).forEach(function(name) {
         tagEmpty($newDicomDOM, name);
     });
+    // hash all UIDs in replaceUID, unless there's a specific instruction
+    // to do something else
     unlessSpecified(replaceUIDs).forEach(function(uidName) {
         // this is counterintuitive but getDicom already hashes UIDs, so
-        // just get the value and replace the existing one
+        // we can never use the original value. Just get the value
+        // and replace the existing one
         tagReplace($newDicomDOM, uidName, parser.getDicom(uidName));
     });
     // last, a few special cases
@@ -172,13 +178,15 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
     tagReplace($newDicomDOM, "DeIdentificationMethod",
         parser.getDicom("DeIdentificationMethod") + "; dcmjs.org");
 
-    // FIXME: remove private groups and any tags
+    // TODO: remove private groups and any tags here - this is currently done
+    // in index.html on parsing DICOMs (private tags are just ignored there)
 };
 
 // in main func:
 // read from old dicom dom and write to new dicomdom
 // FIXME: filePath, mapFile
 var mapDom = function(xmlString, filePath, mapFile, options) {
+    var status = {};
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
 
@@ -187,10 +195,12 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var $newDicomDOM = $($.parseXML(xmlString));
 
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath, options);
+    var parser = getParser($oldDicomDOM, mappingTable, filePath, options, status);
     var specificReplace = getSpecificReplacer(parser);
 
-    // deal with dicoms
+    // deal with specific replace instructions
+    // the specific replace instructions are the the place where
+    // the mapping table can be used
     Object.keys(specificReplace.dicom).forEach(function(name) {
         tagReplace($newDicomDOM, name, specificReplace.dicom[name]());
     });
@@ -201,5 +211,10 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
 
     applyReplaceDefaults($newDicomDOM, specificReplace, parser);
 
-    return $newDicomDOM;
+    return {
+        dicom: $newDicomDOM,
+        status: status,
+        filePath: "TODO",
+        zipFileName: "TODOzipFileName"
+    };
 };
