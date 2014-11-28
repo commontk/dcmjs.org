@@ -47,6 +47,12 @@ $(function() {
     $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
   };
 
+  // utility: todo: keep a log for optional download
+  var status = function(s) {
+    console.log('status: ', s);
+    $('#status').text(s);
+  };
+
   // returns xml string
   // currently unused as it also encodes pixels as ascii -> performance is bad
   var xmlFromDICOM_dcm2xml = function(file, filePath) {
@@ -56,7 +62,7 @@ $(function() {
     file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', filePath, xmlFilePath]);
     file.name, dcmjs.utils.execute('dcm2xml', [filePath, xmlFilePath]);
     if (!dcmjs.utils.fileExists(xmlFilePath)) {
-      print ('skipping non-DICOM file because no xml generated for ' + file.name);
+      status ('skipping non-DICOM file because no xml generated for ' + file.name);
       finalizeFile(file);
       return;
     }
@@ -154,11 +160,11 @@ $(function() {
     var returnCode = dcmjs.utils.execute('dcmdump', ['--print-all', '--write-pixel', '.', '--no-uid-names', filePath]);
     Module.print = print;
 
-    print('returnCode', returnCode); // TODO
+    status('returnCode', returnCode); // TODO
 
     var rawFilePath = filePath + ".0.raw";
     if (!dcmjs.utils.fileExists(rawFilePath)) {
-      print ('skipping non-DICOM file because no raw file generated for ' + file.name);
+      status ('skipping non-DICOM file because no raw file generated for ' + file.name);
       finalizeFile(file); // this assumes access to global function (TODO: could be passed error cb)
       return;
     }
@@ -198,11 +204,11 @@ $(function() {
   var finalizeFile = function(file, path, contents) {
     $('#status').text('Processed ' + file.name + ' to ' + path);
     fileSet.delete(file);
-    var percent = (100. * (fileSetMaxSize - fileSet.size)) / fileSetMaxSize;
-    progress(percent, $('#processingProgressBar'));
+    var processed = (fileSetMaxSize - fileSet.size);
+    var percent = Math.round((100 * processed) / fileSetMaxSize);
     if (path) {
       zipContents = new Uint8Array(contents);
-      print('adding ' + path + "  of size " + zipContents.length);
+      status(file.name + " became " + path + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
       zip.file(path, zipContents, {binary: true});
     }
     if (fileSet.size === 0) {
@@ -224,7 +230,7 @@ $(function() {
     // Delete anything left from previous runs
     dcmjs.utils.deleteFiles([uploadedFilePath, rawFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
 
-    print('Writing...');
+    status('Writing...');
     var uploadedObject = new Int8Array(reader.result);
     FS.writeFile(uploadedFilePath, uploadedObject, {encoding: "binary"});
 
@@ -234,17 +240,19 @@ $(function() {
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     // - take requireMapping from UI (skip non-mapping files vs cancel)
     var mapFile;
-    var result = mapDom(xmlString, filePath, mapFile, {print: print, requireMapping: false});
+    var result = mapDom(xmlString, filePath, mapFile, {
+                  print: print, status: status, requireMapping: false});
     var $newDicomDOM = result.dicom;
     // new information available here:
     // result.status.mapFailed = true or undefined.
     // result.filePath (new file path - TODO)
     // result.zipFileName (TODO)
+    // result.log (TODO)
 
 
 
     // manipulate the dom
-    print(file.name);
+    status(file.name);
     window.$newDicomDOM = $newDicomDOM;
 
     // write the new xml and covert it to dicom
@@ -291,7 +299,7 @@ $(function() {
     dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
     var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
-    print(instanceFilePath + "  of size " + organizedObject.length);
+    status(instanceFilePath + "  of size " + organizedObject.length);
     finalizeFile(file, instanceFilePath, organizedObject);
   }
 
@@ -315,7 +323,6 @@ $(function() {
     // Create a new zip archive
     zip = new JSZip();
     fileSetMaxSize = 0;
-    progress(0, $('#processingProgressBar'));
   }
 
 
@@ -330,11 +337,10 @@ $(function() {
   // Recursive directory read, callback per File
   function readEntry(entry,callback) {
     if (entry.name[0] === '.') {
-      print('ignoring hidden file/directory: ', entry.fullPath);
+      status('ignoring hidden file/directory: ', entry.fullPath);
       return;
     }
     if (entry.isFile) {
-      print(entry.fullPath);
       entry.file(function(file) {
         callback(file, entry.fullPath);
       }, fsErrorHandler);
@@ -355,15 +361,6 @@ $(function() {
     }
   }
   
-  function progress(percent, $element) {
-      var progressBarWidth = percent * $element.width() / 100;
-      $element.find('div').animate({ width: progressBarWidth }, 50).html(percent + "%&nbsp;");
-  }
-
-  function processFiles() {
-    alert('processing...');
-  }
-
   // Setup the file selector listener
   $('#fileSelector').bind('change', handleFileSelect)
 
@@ -386,6 +383,7 @@ $(function() {
           filesByPath[fullPath] = file;
           fileSetMaxSize = fileSet.size;
           $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
+          $('.fileButtons').attr('disabled', false);
         });
       }
     } else {
@@ -412,18 +410,24 @@ $(function() {
   });
 
 
+  // button to clear the input
+  $("#clearFiles").click(function(){
+    cleanupBeforeProcessing();
+    $('#droppedFileList').jqGrid('clearGridData');
+    $('.fileButtons').attr('disabled', true);
+  });
+
   // button to do the actual processing
   $("#processFiles").click(function(){
     cleanupBeforeProcessing();
+    fileSetMaxSize = fileSet.size;
     var fileGrid = JSON.parse($('#droppedFileList').jqGrid('jqGridExport', {exptype: 'jsonstring'}));
-    console.log(fileGrid);
     var gridRows = fileGrid.grid.data;
-    console.log(gridRows);
     var processingGenerator = (function(gridRows) {
       return function() {
         var gridRow = gridRows.pop();
         if (gridRow && gridRow.path) {
-          printToMainContext(gridRow.path); // TODO: make this perform the operation
+          //status(gridRow.path); // TODO: make this perform the operation
           dcmjs.utils.readFile(filesByPath[gridRow.path], organize);  // TODO: keep track of files and file entries
           setTimeout(processingGenerator, 5);
         }
@@ -478,10 +482,9 @@ Main interface for data upload
           <div id="droppedFilePager"></div>
         </div>
       </div>
-      <input type="BUTTON" id="processFiles" value="Process Files" />
+      <input type="BUTTON" class="fileButtons" id="processFiles" value="Process Files" disabled=true />
+      <input type="BUTTON" class="fileButtons" id="clearFiles" value="Clear Files" disabled=true />
     </div>
-
-    <div id="processingProgressBar" class="progressBar"><div></div></div>
 
     <p id='status'>Waiting...</p>
 

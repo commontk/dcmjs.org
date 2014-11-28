@@ -58,7 +58,8 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 // TODO: create a downloadable log
                 var issue = ("No value '" + matchValue +
                       "' found in mapping table column " + matchIndex);
-                options.print(issue);
+                status.log.push(issue);
+                options.status(issue);
                 if (options.requireMapping) {
                   throw(issue);
                 }
@@ -186,7 +187,7 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
 // read from old dicom dom and write to new dicomdom
 // FIXME: filePath, mapFile
 var mapDom = function(xmlString, filePath, mapFile, options) {
-    var status = {};
+    var status = {log: [], mapFailed: false};
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
 
