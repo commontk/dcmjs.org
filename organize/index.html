@@ -24,11 +24,18 @@
 
 $(function() {
 
+  // for use with browser-sync:
+  // # browser-sync start --server --files "*/*.html" "*/*.js" --directory
+
   // sets up the environment to do dicom processing
   dcmjs.utils.initialize();
 
 
   /// globals
+
+  var options = {
+    maxFilesPerZip : 10000,
+  };
 
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
@@ -39,6 +46,7 @@ $(function() {
   // a zip object in which to place the organized
   // DICOM data (the output)
   var zip = new JSZip();
+  var zipIndex = 0;
 
 
   // utility: todo: keep a log for optional download
@@ -207,14 +215,21 @@ $(function() {
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
     if (path) {
-      zipContents = new Uint8Array(contents);
+      var zipContents = new Uint8Array(contents);
       status(file.name + " became " + path + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
       zip.file(path, zipContents, {binary: true});
     }
-    if (fileSet.size === 0) {
+    var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
+    if (fileSet.size === 0 || zipFull) {
       var content = zip.generate({type:"blob"});
       // see FileSaver.js
-      saveAs(content, "organizedDICOM.zip");
+      var zipFileName = "organizedDICOM.zip";
+      if (zipIndex > 0) {
+        zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+      }
+      zipIndex += 1;
+      saveAs(content, zipFileName);
+      zip = new JSZip();
     }
   };
 
@@ -360,7 +375,7 @@ $(function() {
       }
     }
   }
-  
+
   // Setup the file selector listener
   $('#fileSelector').bind('change', handleFileSelect)
 
@@ -373,7 +388,8 @@ $(function() {
     cleanupBeforeProcessing();
 
     // handle the items or files
-    var length = evt.dataTransfer.items.length;
+    var length = -1;
+    if (evt.dataTransfer.items) length = evt.dataTransfer.items.length;
     if (length > -1) {
       // chrome-only transfer that can include dropped directories
       for (var i = 0; i < length; i++) {
@@ -384,6 +400,7 @@ $(function() {
           fileSetMaxSize = fileSet.size;
           $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
           $('.fileButtons').attr('disabled', false);
+          status(fileSetMaxSize + " files to process");
         });
       }
     } else {
@@ -415,6 +432,7 @@ $(function() {
     cleanupBeforeProcessing();
     $('#droppedFileList').jqGrid('clearGridData');
     $('.fileButtons').attr('disabled', true);
+    status('List cleared');
   });
 
   // button to do the actual processing
@@ -427,7 +445,6 @@ $(function() {
       return function() {
         var gridRow = gridRows.pop();
         if (gridRow && gridRow.path) {
-          //status(gridRow.path); // TODO: make this perform the operation
           dcmjs.utils.readFile(filesByPath[gridRow.path], organize);  // TODO: keep track of files and file entries
           setTimeout(processingGenerator, 5);
         }
