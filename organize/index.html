@@ -210,7 +210,6 @@ $(function() {
   // removes file from input set.
   // triggers zip creation and download when set is empty.
   var finalizeFile = function(file, path, contents) {
-    $('#status').text('Processed ' + file.name + ' to ' + path);
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
@@ -438,6 +437,7 @@ $(function() {
   // button to do the actual processing
   $("#processFiles").click(function(){
     cleanupBeforeProcessing();
+    $('.fileButtons').attr('disabled', true);
     fileSetMaxSize = fileSet.size;
     var fileGrid = JSON.parse($('#droppedFileList').jqGrid('jqGridExport', {exptype: 'jsonstring'}));
     var gridRows = fileGrid.grid.data;
