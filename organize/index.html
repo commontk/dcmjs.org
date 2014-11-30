@@ -220,15 +220,19 @@ $(function() {
     }
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
     if (fileSet.size === 0 || zipFull) {
-      var content = zip.generate({type:"blob"});
-      // see FileSaver.js
-      var zipFileName = "organizedDICOM.zip";
-      if (zipIndex > 0) {
-        zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
-      }
-      zipIndex += 1;
-      saveAs(content, zipFileName);
-      zip = new JSZip();
+      status('Generating zip');
+      setTimeout( function() {
+        var content = zip.generate({type:"blob"});
+        // see FileSaver.js
+        var zipFileName = "organizedDICOM.zip";
+        if (zipIndex > 0) {
+          zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+        }
+        zipIndex += 1;
+        saveAs(content, zipFileName);
+        zip = new JSZip();
+        status('Zip completed');
+      }, 0 );
     }
   };
 
@@ -391,17 +395,80 @@ $(function() {
     if (evt.dataTransfer.items) length = evt.dataTransfer.items.length;
     if (length > -1) {
       // chrome-only transfer that can include dropped directories
+
+      var fileConsumer = function(file, fullPath) {
+        fileSet.add(file);
+        filesByPath[fullPath] = file;
+        fileSetMaxSize = fileSet.size;
+        $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
+        status("found " + fileSetMaxSize + " files so far");
+      };
+
+      var doneCallback = function() {
+        fileSetMaxSize = fileSet.size;
+        status(fileSetMaxSize + " files found for processing");
+        $('.fileButtons').attr('disabled', false);
+      }
+
+      var entriesToProcess = [];  // a list of all the entries to process
       for (var i = 0; i < length; i++) {
         var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
-        readEntry(entry, function(file, fullPath) {
-          fileSet.add(file);
-          filesByPath[fullPath] = file;
-          fileSetMaxSize = fileSet.size;
-          $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
-          $('.fileButtons').attr('disabled', false);
-          status(fileSetMaxSize + " files to process");
-        });
+        entriesToProcess.push(entry);
       }
+      var directoryEntriesPending = 0;
+      var fileGenerator = (function(entriesToProcess, fileConsumer, doneCallback) {
+        return function() {
+          var entry = entriesToProcess.pop();
+
+          if (entry) {
+
+            // skip hidden file or directory
+            if (entry.name[0] === '.') {
+              status('ignoring hidden file/directory: ' + entry.name);
+            } else {
+
+              // handle file entry
+              if (entry.isFile) {
+                entry.file(function(file) {
+                  fileConsumer(file, entry.fullPath);
+                }, fsErrorHandler);
+              }
+
+              // handle directory entry
+              if (entry.createReader) {
+                var directoryReader = entry.createReader();
+                var entryHandler = function (results) {
+                  if (results.length) {
+                    // got some entries, so add them to the queue
+                    $.each(results, function(index, entry) {
+                      entriesToProcess.push(entry);
+                    });
+                    directoryReader.readEntries(entryHandler, fsErrorHandler);
+                  } else {
+                    // no result, so this directory read is finished
+                    directoryEntriesPending -= 1;
+                    status(directoryEntriesPending + ' directory finished ' + entry.name);
+                  }
+                };
+                directoryEntriesPending += 1;
+                directoryReader.name = entry.name;
+                directoryReader.readEntries(entryHandler, fsErrorHandler);
+              }
+
+            }
+          }
+
+          if (entriesToProcess.length > 0 || directoryEntriesPending > 0) {
+            // things may still be happening, so we schedule to check again
+            setTimeout(fileGenerator, 5);
+          } else {
+            // no more work to do
+            doneCallback();
+          };
+        };
+      })(entriesToProcess, fileConsumer, doneCallback);
+      fileGenerator();
+
     } else {
       // compatible file-based selection
       var files = evt.dataTransfer.files; // FileList object
