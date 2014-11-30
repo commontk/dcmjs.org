@@ -220,15 +220,18 @@ $(function() {
     }
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
     if (fileSet.size === 0 || zipFull) {
-      var content = zip.generate({type:"blob"});
-      // see FileSaver.js
-      var zipFileName = "organizedDICOM.zip";
-      if (zipIndex > 0) {
-        zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
-      }
-      zipIndex += 1;
-      saveAs(content, zipFileName);
-      zip = new JSZip();
+      status('Generating zip');
+      setTimeout( function() {
+        var content = zip.generate({type:"blob"});
+        // see FileSaver.js
+        var zipFileName = "organizedDICOM.zip";
+        if (zipIndex > 0) {
+          zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+        }
+        zipIndex += 1;
+        saveAs(content, zipFileName);
+        zip = new JSZip();
+      }, 0 );
     }
   };
 
