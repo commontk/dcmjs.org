@@ -104,6 +104,12 @@ function tagReplace(jQDom, name, value) {
 }
 
 function hashUID(uid) {
+
+    /*
+     * comment references:
+     * [1]: http://www.itu.int/rec/T-REC-X.667-201210-I/en
+     */
+
     // FIXME: UUID calculation may not be working correctly.
     function hexStrToBytes(str) {
         var result = [];
@@ -118,38 +124,60 @@ function hashUID(uid) {
         return ((b >> 4) & 0x0f).toString(16) + (b & 0x0f).toString(16);
     }
 
+    // verify whether the dicom UID byte representation is a byte representation of strings,
+    // or does the uid need to be converted before? (question is referenced below)
+    function dicomUidToBytes(uid) {
+        var bytes = [];
+        for (var i = 0; i < uid.length; ++i) {
+            bytes.push(uid.charCodeAt(i));
+        }
+        return bytes;
+    }
+
+    // we're following [1], 14, sub-case 14.3 (SHA1 based)
+    // 14.1 bullet 1
     // allocating the namespace for OID based UUIDs
+    // from: [1], D.9 "Name string is an OID"
     var nsUUID = "6ba7b8129dad11d180b400c04fd430c8";
 
-    // convert name to canonical sequence of octets per 14.3:
-    var hashUIDBytes = hexStrToBytes(sha1(uid));
-    // "hash value" per 14.3 of T-REC-X.667-201210-I
-    var hashValue = hashUIDBytes.slice(0, 16);
-    // Compute the 16-octet hash value of the name space identifier concatenated with the name
-    var preUuidBytes = hashUIDBytes.concat(hashValue);
-    var preUuidString = preUuidBytes.map(function(c){return String.fromCharCode(parseInt(c, 10));}).join("");
-    // FIXME: verify, this step might not work as expected - maybe some wrong preprocessing in sha1.js?
-    var hash = sha1(preUuidString);
+    // 14.1 bullet 2, convert name to canonical seq of octets (idea tb verified)
+    var nsUUIDBytes = hexStrToBytes(nsUUID);
 
+    // 14.1, bullet 3, compute 16-octet hash value of name space identifier concatenated with name,
+    // using SHA-1. (The sentence with "the numbering is..." is tb verified - byte sequence ok?).
+    // This hash value is calculated per 14.3. Just quick verification of byte sequence required
+    // Question: the DICOM UID is a string - does it need any conversion before hashing? Here I assume not.
+    var uidBytes = dicomUidToBytes(uid);
+    // Compute the final 16-octet hash value of the name space identifier concatenated with the name
+    // First concatenate
+    var concatBytes = nsUUIDBytes.concat(uidBytes);
+    // in order to hash the bytes, here I'm converting them to a string first.
+    var concatAsString = concatBytes.map(function(c){return String.fromCharCode(parseInt(c, 10));}).join("");
+    // Then I apply the sha1 on the string.
+    // Question: does sha1() do the right thing? Can we compare to any other sha1 given same input? (
+    // ideally the byte input)
+    var hashValue = sha1(concatAsString);
+    // 14.1, bullets 4-6:
     // Set octets 3 through 0 of the "TimeLow" field to octets 3 through 0 of the hash value.
     // Set octets 1 and 0 of the "TimeMid" field to octets 5 and 4 of the hash value.
     // Set octets 1 and 0 of the "VersionAndTimeHigh" field to octets 7 and 6 of the hash value.
+    // Question: is there any rearrangement taking place or is the outcome just identical to the
+    // byte representation of hashValue? (if yes, I won't need the hashBytes variable for now and stick to the hex hashValue)
+    var hashBytes = hexStrToBytes(hashValue);
+    // 14.1, bullet 7: overwrite the four most sig bits... with the 4-bit version number from Table3 of 12.2..
+    // -> in our case that's "0101" or 5
+    // bullet 8: more placing of octets in sequence (?)
+    // bullet 9: overwrite 2 most sig bits of VariantAndClockSeqHigh with 1 and 0
+    // --> Question: I'm not sure on bullet 9, may have to do a bit level operation there, not sure hex rep
+    // does it.
+    // I did something pro forma (adding the string "9") but also placing needs to be reviewed
+    // (and remaining bullets in 14.1: add rest of bytes in sequence, to be verified)
+    // Btw: I truncate the hash to 16 octets = 32 hex values happens here.
+    var nameUUID = hashValue.slice(0, 12) + "5" + hashValue.slice(13, 16) + "9" + hashValue.slice(17, 32);
 
-    // FIXME: not sure whether above instructions imply some octet shuffling, I'm assuming no for now.
-
-    // - Overwrite the four most significant bits (bits 15 through 12) of the "VersionAndTimeHigh" field with the
-    // four-bit version number from Table 3 of 12.2 for the hash function that was used.
-    // – Set the "VariantAndClockSeqHigh" field to octet 8 of the hash value.
-    // – Overwrite the two most significant bits (bits 7 and 6) of the "VariantAndClockSeqHigh" field with 1 and
-    // 0, respectively.
-    // – Set the "ClockSeqLow" field to octet 9 of the hash value.
-    // – Set octets 5 through 0 of the "Node" field to octets 15 through 10 of the hash value.
-
-    // FIXME: I'm quite sure about "5" in bits 15-12 (four-bit hash version) but not sure about the "9" for bits 7 and 6
-    // (just copied that from somewhere)
-    var nameUUID = hash.slice(0, 12) + "5" + hash.slice(13, 16) + "9" + hash.slice(17, 33);
-
-    // note implicit type casting
+    // finally, casting to a UID again. Need to convert nameUUID to an integer.
+    // I'm doing this quick and dirty here, but the String casting may need some left padding
+    // overall, this conversion needs a quick check
     return "2.25." + hexStrToBytes(nameUUID).join("");
 }
 
