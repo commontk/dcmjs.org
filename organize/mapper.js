@@ -155,7 +155,10 @@ function hashUID(uid) {
     var concatAsString = concatBytes.map(function(c){return String.fromCharCode(parseInt(c, 10));}).join("");
     // Then I apply the sha1 on the string.
     // Question: does sha1() do the right thing? Can we compare to any other sha1 given same input? (
-    // ideally the byte input)
+    // ideally the byte input). I'm actually pretty sure it's not the right thing, as I've tested it against
+    // the example on http://de.wikipedia.org/wiki/Universally_Unique_Identifier.
+    // --> The bytes match but the calculated hash is not the same.
+    // Maybe because strings with non-UTF-8 chars get modified inside sha1() -> better sha1 available?
     var hashValue = sha1(concatAsString);
     // 14.1, bullets 4-6:
     // Set octets 3 through 0 of the "TimeLow" field to octets 3 through 0 of the hash value.
