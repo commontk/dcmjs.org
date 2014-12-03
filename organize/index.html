@@ -257,14 +257,16 @@ $(function() {
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     // - take requireMapping from UI (skip non-mapping files vs cancel)
+    // - take requireDirectoryParsing from UI (put defaults)
     var mapFile;
     var result = mapDom(xmlString, filePath, mapFile, {
-                  print: print, status: status, requireMapping: false});
+                  print: print, status: status, requireMapping: false, requireDirectoryParsing: false});
     var $newDicomDOM = result.dicom;
     // new information available here:
-    // result.status.mapFailed = true or undefined.
-    // result.filePath (new file path - TODO)
-    // result.zipFileName (TODO)
+    // result.status.mapFailed = true if no corresponding value found in mapping table
+    // result.status.filePathFailed = true if input file path didn't match expected file path pattern
+    // result.filePath (new file path)
+    // result.zipFileName
     // result.log (TODO)
 
     // manipulate the dom
@@ -276,31 +278,35 @@ $(function() {
     FS.writeFile(organizedXMLFilePath, organizedObject);
 
     // make a clean study path based on the contents of the file
-    var names = [ 'PatientName',
-                  'Modality',
-                  'StudyDescription',
-                  'StudyDate',
-                  'SeriesNumber',
-                  'SeriesDescription',
-                  'InstanceNumber'];
-    var valuesByName = {};
+    // --> this is now in mapDom/will be user configurable. Special char replacement logic
+    // remains same, but path components are manually selected from old file path as well as dicom
 
-    // replace spaces with underscores and other special chars with %xx uri code
-    var findSpaces = new RegExp(' ', 'g');
-    $.each(names, function (index, name) {
-      var value = $newDicomDOM.find('[name='+name+']').text();
-      value = value.replace(findSpaces, '_');
-      valuesByName[name] = encodeURIComponent(value);
-    });
+    // var names = [ 'PatientName',
+    //               'Modality',
+    //               'StudyDescription',
+    //               'StudyDate',
+    //               'SeriesNumber',
+    //               'SeriesDescription',
+    //               'InstanceNumber'];
+    // var valuesByName = {};
 
-    var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
-                   valuesByName['Modality'] + '-' +
-                   valuesByName['StudyID'] + '_' +
-                   valuesByName['StudyDescription'] + '-' +
-                   valuesByName['StudyDate'];
-    var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
-                       valuesByName['SeriesDescription'] + '-' +
-                       valuesByName['InstanceNumber'] + '.dcm';
+    // // replace spaces with underscores and other special chars with %xx uri code
+    // var findSpaces = new RegExp(' ', 'g');
+    // $.each(names, function (index, name) {
+    //   var value = $newDicomDOM.find('[name='+name+']').text();
+    //   value = value.replace(findSpaces, '_');
+    //   valuesByName[name] = encodeURIComponent(value);
+    // });
+
+    // var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
+    //                valuesByName['Modality'] + '-' +
+    //                valuesByName['StudyID'] + '_' +
+    //                valuesByName['StudyDescription'] + '-' +
+    //                valuesByName['StudyDate'];
+    // var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
+    //                    valuesByName['SeriesDescription'] + '-' +
+    //                    valuesByName['InstanceNumber'] + '.dcm';
+    var instanceFilePath = result.filePath;
 
     // old way:
     // perform the xml undump

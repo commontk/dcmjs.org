@@ -8,6 +8,7 @@
 // - pass filepaths
 // - pass a mapfile
 
+// - bug: if in getSpeificReplacer.dicom: 'TagName': function() {return "mystring"} doesn't ADD the tag if not there.
 
 // example setup
 var mappingTable = [
@@ -15,11 +16,21 @@ var mappingTable = [
     ['', 'wasempty', 5]
 ];
 
+// this describes the expectations of where file path components are found in case
+// they are needed for populating dicom or for saving
+// -> need to retrieve this from UI, maybe even by presenting the user the file path of first
+// dicom found and asking them to enter this string below
+var filePathPattern = 'trialname/centersubj/dicomstudyid/dicomseriesid/';
+
+// this number describes how many path components (of the PROCESSED file path) are grouped
+// in a single zip file. The zip files are labeled according to the grouping.
+var zipGroupLevel = 2;
+
 // from mapdefaults.js
 var defaultEmpty = tagNamesToEmpty;
 var replaceUIDs = instanceUIDs;
 
-// TODO: extract specific instructions from UI
+// TODO: extract below specific instructions from UI
 var getSpecificReplacer = function(parser) {
     return {
         dicom: {
@@ -34,18 +45,29 @@ var getSpecificReplacer = function(parser) {
             // this example finds the patientname in mapping table column 0 and offsets the date by days per column 2
             'StudyDate': function() {
                 return addDays(parser.getDicom('StudyDate'), parser.getMapped(parser.getDicom('PatientName'), 0, 2));
-            }
+            },
         },
-        filePath: {
-            // TODO
-        }
+        // filePath lists the component of the new path. Component names if taken from old filePath must
+        // be available in filePathPattern, and actual file path depth must obviously be greater than
+        // the index at which the argument to getFilePathComp() is found in filePathPattern
+        filePath: [
+            parser.getFilePathComp('trialname'),
+            // TODO: this gets access to the old/non-mapped PatientID. Compare also the getDicom for UIDs.
+            // probably mapping layer should be more orthogonal to spcific replace functions,
+            // and instead, getter functions always retrieve mapped values.
+            // Also, distinguish case of mapping vs just entering new tag content via specificReplacer
+            parser.getFilePathComp('centersubj') + "_" + parser.getDicom('PatientID'),
+            parser.getDicom('StudyDate'),
+            parser.getDicom('SeriesDescription') + "_" + parser.getDicom('SeriesNumber'),
+            parser.getDicom('InstanceNumber') + ".dcm"
+        ]
     };
 };
 
 
 // (parser is created once per run)
 // TODO: var mapTable = list of lists read from mappingFilePath
-var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
+var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, options, status) {
     return {
         getMapped: function(matchValue, matchIndex, newIndex) {
             var mapRow = mapTable.filter(function(row) {
@@ -65,8 +87,29 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 }
             }
         },
-        getFilePath: function(filePath) {
-            return filePath.split(/[\/]+/);
+        // compName should be in filePathCompNames
+        getFilePathComp: function(compName) {
+            var filePathCompNames = filePathPattern.replace(/^\/|\/$/g, '').split('/');
+            var idx = filePathCompNames.indexOf(compName);
+            // slice: path starts with / and first split is ""
+            var pathComps = filePath.split("/").slice(1);
+            if (idx == -1 || idx >= pathComps.length) {
+                var issue;
+                if (idx == -1) {
+                    issue = "path component name not found in component names list";
+                }
+                if (idx >= pathComps.length) {
+                    issue = "the specified path component is deeper than the available directory hierarchy";
+                }
+                status.filePathFailed = true;
+                status.log.push(issue);
+                options.status(issue);
+                if (options.requireDirectoryParsing) {
+                    throw(issue);
+                }
+                return "invalidpath";
+            }
+            return pathComps[idx];
         },
         getDicom: function(tagName) {
             var ret = $oldDicomDom.find('[name=' + tagName + ']').text();
@@ -91,6 +134,12 @@ function addDays(dcmDate, numDays) {
     return newDate.getFullYear() + ('0' + String(parseInt(newDate.getMonth(), 10) + 1)).slice(-2) + ('0' + newDate.getDate()).slice(-2);
 }
 
+// make file path components file system safe
+var cleanFilePath = function(arr) {
+    return arr.map(function(comp) {
+        return encodeURIComponent(comp.replace(/[ \/]/g, '_')) || "unavailable";
+    });
+};
 
 // tag manipulation functions
 // empty if present
@@ -216,18 +265,18 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
 
 // in main func:
 // read from old dicom dom and write to new dicomdom
-// FIXME: filePath, mapFile
 var mapDom = function(xmlString, filePath, mapFile, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
+    if (!options.requireDirectoryParsing) options.requireDirectoryParsing = false;
 
     // make a DOM to query and a DOM to update
     var $oldDicomDOM = $($.parseXML(xmlString));
     var $newDicomDOM = $($.parseXML(xmlString));
 
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath, options, status);
+    var parser = getParser($oldDicomDOM, mappingTable, filePath, filePathPattern, options, status);
     var specificReplace = getSpecificReplacer(parser);
 
     // deal with specific replace instructions
@@ -237,16 +286,16 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
         tagReplace($newDicomDOM, name, specificReplace.dicom[name]());
     });
 
-    Object.keys(specificReplace.filePath).forEach(function(name) {
-        // TODO
-    });
+    // find new path:
+    var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
+    var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
     applyReplaceDefaults($newDicomDOM, specificReplace, parser);
 
     return {
         dicom: $newDicomDOM,
         status: status,
-        filePath: "TODO",
-        zipFileName: "TODOzipFileName"
+        filePath: newFilePath,
+        zipFileName: zipFileName
     };
 };
