@@ -267,8 +267,6 @@ $(function() {
     // result.zipFileName (TODO)
     // result.log (TODO)
 
-
-
     // manipulate the dom
     status(file.name);
     window.$newDicomDOM = $newDicomDOM;
@@ -399,6 +397,7 @@ $(function() {
       var fileConsumer = function(file, fullPath) {
         fileSet.add(file);
         filesByPath[fullPath] = file;
+        file.filePath = fullPath;
         fileSetMaxSize = fileSet.size;
         $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
         status("found " + fileSetMaxSize + " files so far");
@@ -512,7 +511,8 @@ $(function() {
       return function() {
         var gridRow = gridRows.pop();
         if (gridRow && gridRow.path) {
-          dcmjs.utils.readFile(filesByPath[gridRow.path], organize);  // TODO: keep track of files and file entries
+          var filePath = gridRow.path;
+          dcmjs.utils.readFile(filesByPath[filePath], organize, filePath);
           setTimeout(processingGenerator, 5);
         }
       };
