@@ -147,7 +147,8 @@ var tagNamesToEmpty = [
     "GeneratorID",
     "CassetteID",
     "GantryID",
-    "SoftwareVersion",
+    // we keep - should be SoftwareVersions anyway
+    // "SoftwareVersion",
     "ProtocolName",
     "AcquisitionDeviceProcessingDescription",
     "AcquisitionComments",
@@ -256,6 +257,30 @@ var tagNamesToEmpty = [
 // unused still but good if "remove everything except defined".
 // CTP: these have just empty replacement value
 var tagNamesToAlwaysKeep = [
+    //  the first here are specific to this tools workings
+    "Item",
+    "ItemDelimitationItem",
+    "SequenceDelimitationItem",
+    "GenericGroupLength",
+    "PatientIdentityRemoved",
+    "DeIdentificationMethod",
+    "PixelData",
+    // this one is considered OK by us because it usually has very relevant info
+    "SeriesDescription",
+    "SoftwareVersions",
+    "ImagePositionPatient",
+    "ImageOrientationPatient",
+    // the following are annotated as REQUIRE in ctp
+    "Modality",
+    "BodyPartExamined",
+    // the following are annotated as KEEP in ctp
+    "SpecificCharacterSet",
+    "SOPClassUID",
+    "SeriesDate",
+    "Manufacturer",
+    "ManufacturerModelName",
+    "RefSOPClassUID",
+    // the following are just listed
     "ImageType",
     "InstanceCreationTime",
     "QueryRetrieveLevel",
@@ -323,8 +348,10 @@ var tagNamesToAlwaysKeep = [
     "DeIdentificationMethodCodeSeq",
     "ContrastBolusAgentSeq",
     "ContrastBolusAdministrationRouteSeq",
-    "ScanningSeq",
-    "SeqVariant",
+    // "ScanningSeq",
+    "ScanningSequence",
+    "SequenceVariant",
+    // "SeqVariant",
     "ScanOptions",
     "MRAcquisitionType",
     "SequenceName",
@@ -356,7 +383,8 @@ var tagNamesToAlwaysKeep = [
     "NumberOfAverages",
     "ImagingFrequency",
     "ImagedNucleus",
-    "EchoNumber",
+    "EchoNumbers",
+    // "EchoNumber",
     "MagneticFieldStrength",
     "SpacingBetweenSlices",
     "NumberOfPhaseEncodingSteps",

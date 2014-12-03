@@ -1,8 +1,9 @@
 // FIXMEs:
 // - clone $dicomDOM more easily
 // - need a function to create NEW tags in $dicomDOM (see broken implementation in mapDom function)
-// - remove private tags unless specified
+// - remove private tags unless specified OK (temp solution)
 // - optional selector to remove everything that's not in tagNamesToAlwaysKeep (mapdefaults.js)
+//  --> keep special tags! and just check "element" kids of "data-set" (leave meta-header alone)
 //   (these tags are defined, but no logic exists yet)
 // - verify hashUID function
 // - pass filepaths
@@ -152,6 +153,17 @@ function tagReplace(jQDom, name, value) {
     jQDom.find('[name=' + name + ']').text(value || "");
 }
 
+// example implementation
+function tagInsert(jQDom) {
+    jQDom.find("data-set").append($(
+        "<element " +
+            "name='PatientIdentityRemoved'" +
+            "tag = '0012,0062'" +
+            "vr = 'CS'" +
+        ">").append("YES"));
+    console.log("tagInsert done");
+}
+
 function hashUID(uid) {
 
     /*
@@ -234,7 +246,7 @@ function hashUID(uid) {
 }
 
 
-var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
+var applyReplaceDefaults = function(jQDom, specificReplace, parser) {
     function unlessSpecified(tagList) {
         return tagList.filter(function(tag) {
             return !(tag in specificReplace.dicom);
@@ -243,7 +255,7 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
     // empty all tags in defaultEmpty, unless there's a specific instruction
     // to do something else
     unlessSpecified(defaultEmpty).forEach(function(name) {
-        tagEmpty($newDicomDOM, name);
+        tagEmpty(jQDom, name);
     });
     // hash all UIDs in replaceUID, unless there's a specific instruction
     // to do something else
@@ -251,16 +263,37 @@ var applyReplaceDefaults = function($newDicomDOM, specificReplace, parser) {
         // this is counterintuitive but getDicom already hashes UIDs, so
         // we can never use the original value. Just get the value
         // and replace the existing one
-        tagReplace($newDicomDOM, uidName, parser.getDicom(uidName));
+        tagReplace(jQDom, uidName, parser.getDicom(uidName));
     });
     // last, a few special cases
     // FIXME:
-    tagReplace($newDicomDOM, "PatientIdentityRemoved", "YES");
-    tagReplace($newDicomDOM, "DeIdentificationMethod",
+    tagInsert(jQDom);
+    tagReplace(jQDom, "PatientIdentityRemoved", "YES");
+    tagReplace(jQDom, "DeIdentificationMethod",
         parser.getDicom("DeIdentificationMethod") + "; dcmjs.org");
 
     // TODO: remove private groups and any tags here - this is currently done
     // in index.html on parsing DICOMs (private tags are just ignored there)
+};
+
+var removePrivateTags = function(jQDom) {
+    jQDom.find("data-set > element").each(function() {
+        var tag = this.getAttribute('tag');
+        var tagIsPrivate = (Number("0x"+tag[3]) % 2 === 1);
+        if (tagIsPrivate) {
+            this.remove();
+        }
+    });
+};
+
+var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, instanceUids) {
+    jQDom.find("data-set > element").each(function(idx, elm) {
+        var name = elm.getAttribute('name');
+        if (whiteListTags.concat(specialTags).concat(instanceUids)
+                .indexOf(name) == -1) {
+            elm.innerHTML = "";
+        }
+    });
 };
 
 // in main func:
@@ -270,6 +303,8 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
     if (!options.requireDirectoryParsing) options.requireDirectoryParsing = false;
+    if (!options.keepWhitelistedTagsOnly) options.keepWhitelistedTagsOnly = false;
+    if (!options.keepPrivateTags) options.keepPrivateTags = false;
 
     // make a DOM to query and a DOM to update
     var $oldDicomDOM = $($.parseXML(xmlString));
@@ -291,6 +326,15 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
     applyReplaceDefaults($newDicomDOM, specificReplace, parser);
+
+    if (!options.keepPrivateTags) {
+        removePrivateTags($newDicomDOM);
+    }
+
+    if (options.keepWhitelistedTagsOnly) {
+        removeNonWhitelistedTags($newDicomDOM, tagNamesToAlwaysKeep,
+            Object.keys(specificReplace.dicom), instanceUIDs);
+    }
 
     return {
         dicom: $newDicomDOM,

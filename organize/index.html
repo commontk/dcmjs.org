@@ -188,19 +188,16 @@ $(function() {
       var tag = this.getAttribute('tag');
       var vr = this.getAttribute('vr');
       var value = this.innerHTML;
-      // TODO: move private tag handling to the mapper
-      var privateTag = (Number("0x"+tag[3]) % 2 === 1);
+      // moved private tag handling to mapper
       // TODO: move pixel data handling to the mapper
       var pixelData = (tag === "7fe0,0010");
 
-      if (!privateTag) {
-        if (pixelData) {
-          // FIXME: special case based on known file names
-          dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
-        } else {
-          var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
-          dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
-        }
+      if (pixelData) {
+        // FIXME: special case based on known file names
+        dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
+      } else {
+        var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
+        dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
       }
     });
     return(dump);
@@ -258,13 +255,22 @@ $(function() {
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     // - take requireMapping from UI (skip non-mapping files vs cancel)
     // - take requireDirectoryParsing from UI (put defaults)
+    // - take keepWhitelistedTagsOnly from UI (if true, only keeps tags in defined
+    //     tagNamesToAlwaysKeep list)
     var mapFile;
     var result = mapDom(xmlString, filePath, mapFile, {
-                  print: print, status: status, requireMapping: false, requireDirectoryParsing: false});
+                  print: print,
+                  status: status,
+                  requireMapping: false,
+                  requireDirectoryParsing: false,
+                  keepWhitelistedTagsOnly: true,
+                  keepPrivateTags: false
+                });
     var $newDicomDOM = result.dicom;
     // new information available here:
     // result.status.mapFailed = true if no corresponding value found in mapping table
-    // result.status.filePathFailed = true if input file path didn't match expected file path pattern
+    // result.status.filePathFailed = true if input file path didn't match
+    //     expected file path pattern
     // result.filePath (new file path)
     // result.zipFileName
     // result.log (TODO)
