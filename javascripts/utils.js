@@ -84,13 +84,13 @@ dcmjs.utils.execute = function(prog, arguments) {
 /*
   Read the file and invoke processor function
 */
-dcmjs.utils.readFile = function(file, processor) {
+dcmjs.utils.readFile = function(file, processor, filePath) {
   var reader = new FileReader();
 
   // Closure to capture the file information.
-  reader.onload = (function(file) {
-    return function(e) { processor(reader, file) };
-  })(file);
+  reader.onload = (function(file, filePath) {
+    return function(e) { processor(reader, file, filePath) };
+  })(file, filePath);
   //var blob = new Blob([typedArray], {type: 'application/octet-binary'});
   // Read in the image file
   reader.readAsArrayBuffer(file);

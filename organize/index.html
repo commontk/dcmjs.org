@@ -188,19 +188,16 @@ $(function() {
       var tag = this.getAttribute('tag');
       var vr = this.getAttribute('vr');
       var value = this.innerHTML;
-      // TODO: move private tag handling to the mapper
-      var privateTag = (Number("0x"+tag[3]) % 2 === 1);
+      // moved private tag handling to mapper
       // TODO: move pixel data handling to the mapper
       var pixelData = (tag === "7fe0,0010");
 
-      if (!privateTag) {
-        if (pixelData) {
-          // FIXME: special case based on known file names
-          dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
-        } else {
-          var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
-          dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
-        }
+      if (pixelData) {
+        // FIXME: special case based on known file names
+        dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
+      } else {
+        var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
+        dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
       }
     });
     return(dump);
@@ -210,7 +207,6 @@ $(function() {
   // removes file from input set.
   // triggers zip creation and download when set is empty.
   var finalizeFile = function(file, path, contents) {
-    $('#status').text('Processed ' + file.name + ' to ' + path);
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
@@ -221,15 +217,19 @@ $(function() {
     }
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
     if (fileSet.size === 0 || zipFull) {
-      var content = zip.generate({type:"blob"});
-      // see FileSaver.js
-      var zipFileName = "organizedDICOM.zip";
-      if (zipIndex > 0) {
-        zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
-      }
-      zipIndex += 1;
-      saveAs(content, zipFileName);
-      zip = new JSZip();
+      status('Generating zip');
+      setTimeout( function() {
+        var content = zip.generate({type:"blob"});
+        // see FileSaver.js
+        var zipFileName = "organizedDICOM.zip";
+        if (zipIndex > 0) {
+          zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+        }
+        zipIndex += 1;
+        saveAs(content, zipFileName);
+        zip = new JSZip();
+        status('Zip completed');
+      }, 0 );
     }
   };
 
@@ -254,17 +254,26 @@ $(function() {
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     // - take requireMapping from UI (skip non-mapping files vs cancel)
+    // - take requireDirectoryParsing from UI (put defaults)
+    // - take keepWhitelistedTagsOnly from UI (if true, only keeps tags in defined
+    //     tagNamesToAlwaysKeep list)
     var mapFile;
     var result = mapDom(xmlString, filePath, mapFile, {
-                  print: print, status: status, requireMapping: false});
+                  print: print,
+                  status: status,
+                  requireMapping: false,
+                  requireDirectoryParsing: false,
+                  keepWhitelistedTagsOnly: true,
+                  keepPrivateTags: false
+                });
     var $newDicomDOM = result.dicom;
     // new information available here:
-    // result.status.mapFailed = true or undefined.
-    // result.filePath (new file path - TODO)
-    // result.zipFileName (TODO)
+    // result.status.mapFailed = true if no corresponding value found in mapping table
+    // result.status.filePathFailed = true if input file path didn't match
+    //     expected file path pattern
+    // result.filePath (new file path)
+    // result.zipFileName
     // result.log (TODO)
-
-
 
     // manipulate the dom
     status(file.name);
@@ -275,31 +284,35 @@ $(function() {
     FS.writeFile(organizedXMLFilePath, organizedObject);
 
     // make a clean study path based on the contents of the file
-    var names = [ 'PatientName',
-                  'Modality',
-                  'StudyDescription',
-                  'StudyDate',
-                  'SeriesNumber',
-                  'SeriesDescription',
-                  'InstanceNumber'];
-    var valuesByName = {};
+    // --> this is now in mapDom/will be user configurable. Special char replacement logic
+    // remains same, but path components are manually selected from old file path as well as dicom
 
-    // replace spaces with underscores and other special chars with %xx uri code
-    var findSpaces = new RegExp(' ', 'g');
-    $.each(names, function (index, name) {
-      var value = $newDicomDOM.find('[name='+name+']').text();
-      value = value.replace(findSpaces, '_');
-      valuesByName[name] = encodeURIComponent(value);
-    });
+    // var names = [ 'PatientName',
+    //               'Modality',
+    //               'StudyDescription',
+    //               'StudyDate',
+    //               'SeriesNumber',
+    //               'SeriesDescription',
+    //               'InstanceNumber'];
+    // var valuesByName = {};
 
-    var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
-                   valuesByName['Modality'] + '-' +
-                   valuesByName['StudyID'] + '_' +
-                   valuesByName['StudyDescription'] + '-' +
-                   valuesByName['StudyDate'];
-    var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
-                       valuesByName['SeriesDescription'] + '-' +
-                       valuesByName['InstanceNumber'] + '.dcm';
+    // // replace spaces with underscores and other special chars with %xx uri code
+    // var findSpaces = new RegExp(' ', 'g');
+    // $.each(names, function (index, name) {
+    //   var value = $newDicomDOM.find('[name='+name+']').text();
+    //   value = value.replace(findSpaces, '_');
+    //   valuesByName[name] = encodeURIComponent(value);
+    // });
+
+    // var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
+    //                valuesByName['Modality'] + '-' +
+    //                valuesByName['StudyID'] + '_' +
+    //                valuesByName['StudyDescription'] + '-' +
+    //                valuesByName['StudyDate'];
+    // var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
+    //                    valuesByName['SeriesDescription'] + '-' +
+    //                    valuesByName['InstanceNumber'] + '.dcm';
+    var instanceFilePath = result.filePath;
 
     // old way:
     // perform the xml undump
@@ -392,17 +405,81 @@ $(function() {
     if (evt.dataTransfer.items) length = evt.dataTransfer.items.length;
     if (length > -1) {
       // chrome-only transfer that can include dropped directories
+
+      var fileConsumer = function(file, fullPath) {
+        fileSet.add(file);
+        filesByPath[fullPath] = file;
+        file.filePath = fullPath;
+        fileSetMaxSize = fileSet.size;
+        $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
+        status("found " + fileSetMaxSize + " files so far");
+      };
+
+      var doneCallback = function() {
+        fileSetMaxSize = fileSet.size;
+        status(fileSetMaxSize + " files found for processing");
+        $('.fileButtons').attr('disabled', false);
+      }
+
+      var entriesToProcess = [];  // a list of all the entries to process
       for (var i = 0; i < length; i++) {
         var entry = evt.dataTransfer.items[i].webkitGetAsEntry();
-        readEntry(entry, function(file, fullPath) {
-          fileSet.add(file);
-          filesByPath[fullPath] = file;
-          fileSetMaxSize = fileSet.size;
-          $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
-          $('.fileButtons').attr('disabled', false);
-          status(fileSetMaxSize + " files to process");
-        });
+        entriesToProcess.push(entry);
       }
+      var directoryEntriesPending = 0;
+      var fileGenerator = (function(entriesToProcess, fileConsumer, doneCallback) {
+        return function() {
+          var entry = entriesToProcess.pop();
+
+          if (entry) {
+
+            // skip hidden file or directory
+            if (entry.name[0] === '.') {
+              status('ignoring hidden file/directory: ' + entry.name);
+            } else {
+
+              // handle file entry
+              if (entry.isFile) {
+                entry.file(function(file) {
+                  fileConsumer(file, entry.fullPath);
+                }, fsErrorHandler);
+              }
+
+              // handle directory entry
+              if (entry.createReader) {
+                var directoryReader = entry.createReader();
+                var entryHandler = function (results) {
+                  if (results.length) {
+                    // got some entries, so add them to the queue
+                    $.each(results, function(index, entry) {
+                      entriesToProcess.push(entry);
+                    });
+                    directoryReader.readEntries(entryHandler, fsErrorHandler);
+                  } else {
+                    // no result, so this directory read is finished
+                    directoryEntriesPending -= 1;
+                    status(directoryEntriesPending + ' directory finished ' + entry.name);
+                  }
+                };
+                directoryEntriesPending += 1;
+                directoryReader.name = entry.name;
+                directoryReader.readEntries(entryHandler, fsErrorHandler);
+              }
+
+            }
+          }
+
+          if (entriesToProcess.length > 0 || directoryEntriesPending > 0) {
+            // things may still be happening, so we schedule to check again
+            setTimeout(fileGenerator, 5);
+          } else {
+            // no more work to do
+            doneCallback();
+          };
+        };
+      })(entriesToProcess, fileConsumer, doneCallback);
+      fileGenerator();
+
     } else {
       // compatible file-based selection
       var files = evt.dataTransfer.files; // FileList object
@@ -439,6 +516,7 @@ $(function() {
   // button to do the actual processing
   $("#processFiles").click(function(){
     cleanupBeforeProcessing();
+    $('.fileButtons').attr('disabled', true);
     fileSetMaxSize = fileSet.size;
     var fileGrid = JSON.parse($('#droppedFileList').jqGrid('jqGridExport', {exptype: 'jsonstring'}));
     var gridRows = fileGrid.grid.data;
@@ -446,7 +524,8 @@ $(function() {
       return function() {
         var gridRow = gridRows.pop();
         if (gridRow && gridRow.path) {
-          dcmjs.utils.readFile(filesByPath[gridRow.path], organize);  // TODO: keep track of files and file entries
+          var filePath = gridRow.path;
+          dcmjs.utils.readFile(filesByPath[filePath], organize, filePath);
           setTimeout(processingGenerator, 5);
         }
       };
