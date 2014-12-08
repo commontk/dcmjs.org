@@ -529,6 +529,8 @@ $(function() {
           var filePath = gridRow.path;
           dcmjs.utils.readFile(filesByPath[filePath], organize, filePath);
           setTimeout(processingGenerator, 5);
+        } else {
+          $('.fileButtons').attr('disabled', false);
         }
       };
     })(gridRows);
