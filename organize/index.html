@@ -41,6 +41,7 @@ $(function() {
   // dropped or selected by the user (the input)
   var fileSet = new Set();
   var fileSetMaxSize = 0;
+  var filePaths = [];
   var filesByPath = {};
 
   // a zip object in which to place the organized
@@ -409,14 +410,15 @@ $(function() {
       var fileConsumer = function(file, fullPath) {
         fileSet.add(file);
         filesByPath[fullPath] = file;
+        filePaths.push({path: fullPath});
         file.filePath = fullPath;
         fileSetMaxSize = fileSet.size;
-        $('#droppedFileList').jqGrid('addRowData',fileSetMaxSize, {path: fullPath});
         status("found " + fileSetMaxSize + " files so far");
       };
 
       var doneCallback = function() {
         fileSetMaxSize = fileSet.size;
+        $('#droppedFileList').jqGrid('addRowData', 0, filePaths);
         status(fileSetMaxSize + " files found for processing");
         $('.fileButtons').attr('disabled', false);
       }
