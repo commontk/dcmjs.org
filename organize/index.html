@@ -276,51 +276,7 @@ $(function() {
     // result.zipFileName
     // result.log (TODO)
 
-    // manipulate the dom
-    status(file.name);
-    window.$newDicomDOM = $newDicomDOM;
-
-    // write the new xml and covert it to dicom
-    var organizedObject = (new XMLSerializer()).serializeToString($newDicomDOM[0]);
-    FS.writeFile(organizedXMLFilePath, organizedObject);
-
-    // make a clean study path based on the contents of the file
-    // --> this is now in mapDom/will be user configurable. Special char replacement logic
-    // remains same, but path components are manually selected from old file path as well as dicom
-
-    // var names = [ 'PatientName',
-    //               'Modality',
-    //               'StudyDescription',
-    //               'StudyDate',
-    //               'SeriesNumber',
-    //               'SeriesDescription',
-    //               'InstanceNumber'];
-    // var valuesByName = {};
-
-    // // replace spaces with underscores and other special chars with %xx uri code
-    // var findSpaces = new RegExp(' ', 'g');
-    // $.each(names, function (index, name) {
-    //   var value = $newDicomDOM.find('[name='+name+']').text();
-    //   value = value.replace(findSpaces, '_');
-    //   valuesByName[name] = encodeURIComponent(value);
-    // });
-
-    // var studyPath = '/' + (valuesByName['PatientName'] || 'na') + '-' +
-    //                valuesByName['Modality'] + '-' +
-    //                valuesByName['StudyID'] + '_' +
-    //                valuesByName['StudyDescription'] + '-' +
-    //                valuesByName['StudyDate'];
-    // var instanceFilePath = studyPath + '/' + valuesByName['SeriesNumber'] + '_' +
-    //                    valuesByName['SeriesDescription'] + '-' +
-    //                    valuesByName['InstanceNumber'] + '.dcm';
-    var instanceFilePath = result.filePath;
-
-    // old way:
-    // perform the xml undump
-    /////dcmjs.utils.execute('xml2dcm', [organizedXMLFilePath, organizedDICOMFilePath]);
-
-
-    // conver to dump and save
+    // convert to dump and save
     var dump = dicomDOMToDump($newDicomDOM);
     FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
 
@@ -328,8 +284,8 @@ $(function() {
     dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
     var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
-    status(instanceFilePath + "  of size " + organizedObject.length);
-    finalizeFile(file, instanceFilePath, organizedObject);
+    status(result.filePath + "  of size " + organizedObject.length);
+    finalizeFile(file, result.filePath, organizedObject);
   }
 
   // Used for file selection button or drop of file list
