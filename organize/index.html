@@ -214,10 +214,10 @@ $(function() {
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
-    if (mapResult && mapResult.path) {
+    if (mapResult && mapResult.filePath) {
       var zipContents = new Uint8Array(contents);
-      status(file.name + " became " + mapResult.path + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
-      zip.file(mapResult.path, zipContents, {binary: true});
+      status(file.name + " became " + mapResult.filePath + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
+      zip.file(mapResult.filePath, zipContents, {binary: true});
     }
     if (mapResult && mapResult.status.log.length > 0) {
       mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log})
