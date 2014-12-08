@@ -198,7 +198,7 @@ $(function() {
 
       if (pixelData) {
         // FIXME: special case based on known file names
-        dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw';
+        dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw\n';
       } else {
         var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
         dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
@@ -488,11 +488,17 @@ $(function() {
       return function() {
         var gridRow = gridRows.pop();
         if (gridRow && gridRow.path) {
+          // process one path
           var filePath = gridRow.path;
           dcmjs.utils.readFile(filesByPath[filePath], organize, filePath);
           setTimeout(processingGenerator, 5);
         } else {
+          // no path, so finish processing and clean up
+          // - reset GUI
+          // - reset processing-related global variables
+          // - print result to page
           $('.fileButtons').attr('disabled', false);
+          zipIndex = 0;
           if (mappingLog.length > 0) {
             printToMainContext('The following messages were generated during the mapping:  ');
             $.each(mappingLog, function (index, logEntry) {

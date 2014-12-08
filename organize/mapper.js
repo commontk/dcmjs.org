@@ -14,6 +14,7 @@
 // example setup
 var mappingTable = [
     ['anonymous', 'mappedname', 1],
+    ['2766852498', 'AnonymousPatient', 1],
     ['', 'wasempty', 5]
 ];
 
