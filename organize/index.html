@@ -44,6 +44,9 @@ $(function() {
   var filePaths = [];
   var filesByPath = {};
 
+  // log of the processing activities
+  var mappingLog = [];
+
   // a zip object in which to place the organized
   // DICOM data (the output)
   var zip = new JSZip();
@@ -207,14 +210,17 @@ $(function() {
   // adds contents to zip object at specified path.
   // removes file from input set.
   // triggers zip creation and download when set is empty.
-  var finalizeFile = function(file, path, contents) {
+  var finalizeFile = function(file, mapResult, contents) {
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
-    if (path) {
+    if (mapResult && mapResult.path) {
       var zipContents = new Uint8Array(contents);
-      status(file.name + " became " + path + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
-      zip.file(path, zipContents, {binary: true});
+      status(file.name + " became " + mapResult.path + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
+      zip.file(mapResult.path, zipContents, {binary: true});
+    }
+    if (mapResult && mapResult.status.log.length > 0) {
+      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log})
     }
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
     if (fileSet.size === 0 || zipFull) {
@@ -285,7 +291,7 @@ $(function() {
     var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
     status(result.filePath + "  of size " + organizedObject.length);
-    finalizeFile(file, result.filePath, organizedObject);
+    finalizeFile(file, result, organizedObject);
   }
 
   // Used for file selection button or drop of file list
@@ -487,6 +493,14 @@ $(function() {
           setTimeout(processingGenerator, 5);
         } else {
           $('.fileButtons').attr('disabled', false);
+          if (mappingLog.length > 0) {
+            printToMainContext('The following messages were generated during the mapping:  ');
+            $.each(mappingLog, function (index, logEntry) {
+              printToMainContext(logEntry.filePath + ": " + logEntry.log);
+            });
+          } else {
+            printToMainContext('No messages were generated during the mapping.');
+          }
         }
       };
     })(gridRows);
