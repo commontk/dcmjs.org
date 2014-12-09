@@ -39,8 +39,8 @@ $(function() {
     mapOptions: {
       keepPrivateTags: false,
       keepWhitelistedTagsOnly: false,
-      requireMapping: true,
-      requireDirectoryMatch: true
+      requireMapping: false,
+      requireDirectoryMatch: false
     },
     // maybe even present the user the file path of first
     // dicom found and ask them to enter this string below?
@@ -565,8 +565,7 @@ $(function() {
   <div class="container">
     <h1>dcmjs organize</h1>
     <h2>Organize and anonymize dicom files in your browser (they are not sent to a server)</h2>
-
-    <h2>NOTE: this is still a work in progress and is not yet ready for routine use!</h2>
+    <h2>NOTE: this is not yet ready for routine use!</h2>
   </div>
 </header>
 
