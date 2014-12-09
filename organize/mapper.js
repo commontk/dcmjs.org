@@ -18,12 +18,6 @@ var mappingTable = [
     ['', 'wasempty', 5]
 ];
 
-// this describes the expectations of where file path components are found in case
-// they are needed for populating dicom or for saving
-// -> need to retrieve this from UI, maybe even by presenting the user the file path of first
-// dicom found and asking them to enter this string below
-var filePathPattern = 'trialname/centersubj/dicomstudyid/dicomseriesid/';
-
 // this number describes how many path components (of the PROCESSED file path) are grouped
 // in a single zip file. The zip files are labeled according to the grouping.
 var zipGroupLevel = 2;
@@ -69,7 +63,7 @@ var getSpecificReplacer = function(parser) {
 
 // (parser is created once per run)
 // TODO: var mapTable = list of lists read from mappingFilePath
-var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, options, status) {
+var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
     return {
         getMapped: function(matchValue, matchIndex, newIndex) {
             var mapRow = mapTable.filter(function(row) {
@@ -91,7 +85,9 @@ var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, opti
         },
         // compName should be in filePathCompNames
         getFilePathComp: function(compName) {
-            var filePathCompNames = filePathPattern.replace(/^\/|\/$/g, '').split('/');
+            // filePathPattern describes the expectations of where file path components are found in case
+            // they are needed for populating dicom or for saving
+            var filePathCompNames = options.filePathPattern.replace(/^\/|\/$/g, '').split('/');
             var idx = filePathCompNames.indexOf(compName);
             // slice: path starts with / and first split is ""
             var pathComps = filePath.split("/").slice(1);
@@ -106,7 +102,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, opti
                 status.filePathFailed = true;
                 status.log.push(issue);
                 options.status(issue);
-                if (options.requireDirectoryParsing) {
+                if (options.requireDirectoryMatch) {
                     throw(issue);
                 }
                 return "invalidpath";
@@ -303,7 +299,7 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
     if (!options.requireMapping) options.requireMapping = false;
-    if (!options.requireDirectoryParsing) options.requireDirectoryParsing = false;
+    if (!options.requireDirectoryMatch) options.requireDirectoryMatch = false;
     if (!options.keepWhitelistedTagsOnly) options.keepWhitelistedTagsOnly = false;
     if (!options.keepPrivateTags) options.keepPrivateTags = false;
 
@@ -312,7 +308,7 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var $newDicomDOM = $($.parseXML(xmlString));
 
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath, filePathPattern, options, status);
+    var parser = getParser($oldDicomDOM, mappingTable, filePath, options, status);
     var specificReplace = getSpecificReplacer(parser);
 
     // deal with specific replace instructions

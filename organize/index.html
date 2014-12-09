@@ -35,7 +35,43 @@ $(function() {
 
   var options = {
     maxFilesPerZip : 10000,
+    // defaults for checkbox options
+    mapOptions: {
+      keepPrivateTags: false,
+      keepWhitelistedTagsOnly: false,
+      requireMapping: true,
+      requireDirectoryMatch: true
+    },
+    // maybe even present the user the file path of first
+    // dicom found and ask them to enter this string below?
+    filePathPattern: 'trialname/centersubj/dicomstudyid/dicomseriesid/'
   };
+
+  // set up and link checkboxes to mapOptions dict
+  var boxesDiv = $('#checkboxes');
+  Object.keys(options.mapOptions).forEach(function(optName) {
+        var checkDiv = $('<div>');
+        boxesDiv.append(checkDiv);
+        var chbox = $('<input/>', {type: 'checkbox', id: optName, value: optName});
+        chbox.appendTo(checkDiv);
+        $('<label/>', { 'for': optName, text: optName}).appendTo(checkDiv);
+        // defaults
+        chbox.prop('checked', options.mapOptions[optName]);
+        chbox.change(function() {
+          options.mapOptions[optName] = chbox.prop('checked');
+        });
+  });
+
+  // allow editing of filepath pattern
+  var filePatternDiv = $('#filepatterndiv');
+  var filePatternInp = $('<input/>', {type: 'text', id: 'filepattern',
+    value: options.filePathPattern});
+  filePatternInp.prop('size', 70);
+  $('<label/>', { 'for': 'filepattern', text: 'folder pattern: /'}).appendTo(filePatternDiv);
+  filePatternInp.appendTo(filePatternDiv);
+  filePatternInp.on('keyup change', function() {
+    options.filePathPattern = filePatternInp.val();
+  });
 
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
@@ -260,18 +296,15 @@ $(function() {
 
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
-    // - take requireMapping from UI (skip non-mapping files vs cancel)
-    // - take requireDirectoryParsing from UI (put defaults)
-    // - take keepWhitelistedTagsOnly from UI (if true, only keeps tags in defined
-    //     tagNamesToAlwaysKeep list)
     var mapFile;
     var result = mapDom(xmlString, filePath, mapFile, {
                   print: print,
                   status: status,
-                  requireMapping: false,
-                  requireDirectoryParsing: false,
-                  keepWhitelistedTagsOnly: true,
-                  keepPrivateTags: false
+                  requireMapping: options.mapOptions.requireMapping,
+                  requireDirectoryMatch: options.mapOptions.requireDirectoryMatch,
+                  keepWhitelistedTagsOnly: options.mapOptions.keepWhitelistedTagsOnly,
+                  keepPrivateTags: options.mapOptions.keepPrivateTags,
+                  filePathPattern: options.filePathPattern
                 });
     var $newDicomDOM = result.dicom;
     // new information available here:
@@ -353,7 +386,7 @@ $(function() {
   }
 
   // Setup the file selector listener
-  $('#fileSelector').bind('change', handleFileSelect)
+  $('#fileSelector').bind('change', handleFileSelect);
 
   // Drag and Drop
   function handleFileDrop(e) {
@@ -545,10 +578,11 @@ Main interface for data upload
 <div class="container">
   <section id="main_content" style="display:none;">
 
+    <div id="checkboxes"></div>
+    <div id="filepatterndiv"></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
     <input type="file" id="fileSelector" name="selectorFiles[]" multiple />
-
     <p>Or</p>
 
     <!-- Drag and Drop -->
