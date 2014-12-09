@@ -37,9 +37,16 @@ $(function() {
     maxFilesPerZip : 10000,
     // defaults for checkbox options
     mapOptions: {
+      // set true to avoid removing private tags
       keepPrivateTags: false,
+      // set true for strict tag removal:
+      // remove everything in header except what dcmjs.org has as a whitelist
       keepWhitelistedTagsOnly: false,
-      requireMapping: false,
+      // set true to throw an error if any mapping instruction fails, i.e.
+      // the original lookup value is not found in mappingTable
+      forceMapping: false,
+      // set true to keep files where a mapping instruction failed (no lookup value found)
+      keepMappingFailures: false,
       requireDirectoryMatch: false
     },
     // maybe even present the user the file path of first

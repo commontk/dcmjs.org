@@ -78,7 +78,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                       "' found in mapping table column " + matchIndex);
                 status.log.push(issue);
                 options.status(issue);
-                if (options.mapOptions.requireMapping) {
+                if (options.mapOptions.forceMapping) {
                   throw(issue);
                 }
             }
@@ -314,7 +314,7 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 var mapDom = function(xmlString, filePath, mapFile, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
-    ['requireMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
+    ['forceMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
             .forEach(function(optName) {
         if (typeof options.mapOptions[optName] == 'undefined') options.mapOptions[optName] = false;
     });
