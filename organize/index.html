@@ -256,7 +256,7 @@ $(function() {
       zip.file(mapResult.filePath, zipContents, {binary: true});
     }
     if (mapResult && mapResult.status.log.length > 0) {
-      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log})
+      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log});
     }
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
     if (fileSet.size === 0 || zipFull) {
@@ -300,10 +300,7 @@ $(function() {
     var result = mapDom(xmlString, filePath, mapFile, {
                   print: print,
                   status: status,
-                  requireMapping: options.mapOptions.requireMapping,
-                  requireDirectoryMatch: options.mapOptions.requireDirectoryMatch,
-                  keepWhitelistedTagsOnly: options.mapOptions.keepWhitelistedTagsOnly,
-                  keepPrivateTags: options.mapOptions.keepPrivateTags,
+                  mapOptions: options.mapOptions,
                   filePathPattern: options.filePathPattern
                 });
     var $newDicomDOM = result.dicom;
@@ -313,7 +310,7 @@ $(function() {
     //     expected file path pattern
     // result.filePath (new file path)
     // result.zipFileName
-    // result.log (TODO)
+    // result.status.log
 
     // convert to dump and save
     var dump = dicomDOMToDump($newDicomDOM);
@@ -325,7 +322,7 @@ $(function() {
 
     status(result.filePath + "  of size " + organizedObject.length);
     finalizeFile(file, result, organizedObject);
-  }
+  };
 
   // Used for file selection button or drop of file list
   var readSelectedFiles = function(files) {
@@ -333,7 +330,7 @@ $(function() {
       fileSet.add(file);
       dcmjs.utils.readFile(file, organize);
     });
-  }
+  };
 
 
   function fsErrorHandler(e) {

@@ -98,7 +98,7 @@ var tagNamesToEmpty = [
     "NameOfPhysicianReadingStudy",
     "PhysicianReadingStudyIdSeq",
     "OperatorName",
-    "OperatorsIdentificationSeq",
+    // "OperatorsIdentificationSeq",
     "AdmittingDiagnosisDescription",
     "AdmittingDiagnosisCodeSeq",
     "RefStudySeq",
@@ -280,7 +280,7 @@ var tagNamesToAlwaysKeep = [
     "Manufacturer",
     "ManufacturerModelName",
     "RefSOPClassUID",
-    // the following are just listed
+    // the following are just listed like this
     "ImageType",
     "InstanceCreationTime",
     "QueryRetrieveLevel",

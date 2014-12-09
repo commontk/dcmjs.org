@@ -78,7 +78,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                       "' found in mapping table column " + matchIndex);
                 status.log.push(issue);
                 options.status(issue);
-                if (options.requireMapping) {
+                if (options.mapOptions.requireMapping) {
                   throw(issue);
                 }
             }
@@ -102,7 +102,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 status.filePathFailed = true;
                 status.log.push(issue);
                 options.status(issue);
-                if (options.requireDirectoryMatch) {
+                if (options.mapOptions.requireDirectoryMatch) {
                     throw(issue);
                 }
                 return "invalidpath";
@@ -151,14 +151,35 @@ function tagReplace(jQDom, name, value) {
 }
 
 // example implementation
-function tagInsert(jQDom) {
+function tagAsAnonymized(jQDom, mapOptions) {
+    function optionsAsString() {
+        // need to keep the full tag under 64 chars!
+        var options = [];
+        ['keepPrivateTags', 'keepWhitelistedTagsOnly']
+            .forEach(function(optName) {
+                if (mapOptions[optName]) {
+                    options.push(optName);
+                }
+            });
+        return options.length ? ' - ' + options.join(', ') : '';
+        // return Object.keys(mapOptions).map(function(key) {
+        //     return key + ":" + mapOptions[key];
+        // }).join(", ");
+    }
+    // set Patient Identity Removed to YES
     jQDom.find("data-set").append($(
-        "<element " +
-            "name='PatientIdentityRemoved'" +
-            "tag = '0012,0062'" +
-            "vr = 'CS'" +
-        ">").append("YES"));
-    console.log("tagInsert done");
+            "<element " +
+                "name='PatientIdentityRemoved'" +
+                "tag = '0012,0062'" +
+                "vr = 'CS'" +
+            ">").append("YES"))
+    // set Deidentification method
+        .append($(
+            "<element " +
+                "name='DeIdentificationMethod'" +
+                "tag = '0012,0063'" +
+                "vr = 'LO'" +
+            ">").append("dcmjs.org" + optionsAsString()));
 }
 
 function hashUID(uid) {
@@ -242,8 +263,10 @@ function hashUID(uid) {
     return "2.25." + hexStrToBytes(nameUUID).join("");
 }
 
-
-var applyReplaceDefaults = function(jQDom, specificReplace, parser) {
+/*
+ * options - currently only passed for adding options to DICOM header after anonymization
+ */
+var applyReplaceDefaults = function(jQDom, specificReplace, parser, options) {
     function unlessSpecified(tagList) {
         return tagList.filter(function(tag) {
             return !(tag in specificReplace.dicom);
@@ -263,14 +286,7 @@ var applyReplaceDefaults = function(jQDom, specificReplace, parser) {
         tagReplace(jQDom, uidName, parser.getDicom(uidName));
     });
     // last, a few special cases
-    // FIXME:
-    tagInsert(jQDom);
-    tagReplace(jQDom, "PatientIdentityRemoved", "YES");
-    tagReplace(jQDom, "DeIdentificationMethod",
-        parser.getDicom("DeIdentificationMethod") + "; dcmjs.org");
-
-    // TODO: remove private groups and any tags here - this is currently done
-    // in index.html on parsing DICOMs (private tags are just ignored there)
+    tagAsAnonymized(jQDom, options.mapOptions);
 };
 
 var removePrivateTags = function(jQDom) {
@@ -298,10 +314,10 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 var mapDom = function(xmlString, filePath, mapFile, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
-    if (!options.requireMapping) options.requireMapping = false;
-    if (!options.requireDirectoryMatch) options.requireDirectoryMatch = false;
-    if (!options.keepWhitelistedTagsOnly) options.keepWhitelistedTagsOnly = false;
-    if (!options.keepPrivateTags) options.keepPrivateTags = false;
+    ['requireMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
+            .forEach(function(optName) {
+        if (typeof options.mapOptions[optName] == 'undefined') options.mapOptions[optName] = false;
+    });
 
     // make a DOM to query and a DOM to update
     var $oldDicomDOM = $($.parseXML(xmlString));
@@ -322,13 +338,13 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
     var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
-    applyReplaceDefaults($newDicomDOM, specificReplace, parser);
+    applyReplaceDefaults($newDicomDOM, specificReplace, parser, options);
 
-    if (!options.keepPrivateTags) {
+    if (!options.mapOptions.keepPrivateTags) {
         removePrivateTags($newDicomDOM);
     }
 
-    if (options.keepWhitelistedTagsOnly) {
+    if (options.mapOptions.keepWhitelistedTagsOnly) {
         removeNonWhitelistedTags($newDicomDOM, tagNamesToAlwaysKeep,
             Object.keys(specificReplace.dicom), instanceUIDs);
     }
