@@ -99,13 +99,13 @@ $(function() {
   // utility: todo: keep a log for optional download
   var print = function(s) {
     console.log(s);
-    $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
+    // $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
   };
 
   // utility: todo: keep a log for optional download
   var status = function(s) {
     console.log('status: ', s);
-    $('#status').text(s);
+    // $('#status').text(s);
   };
 
   // returns xml string
@@ -590,7 +590,7 @@ Main interface for data upload
 
     <!-- Drag and Drop -->
     <div class="files_wrapper">
-      <div class="area_file" id="fileDropZone">Drop your DICOM files here
+      <div class="area_file" id="fileDropZone">Drop your DICOM files or folders here
         <div class="fileList" id="droppedFileArea">
           <table id="droppedFileList"></table>
           <div id="droppedFilePager"></div>

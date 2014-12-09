@@ -275,13 +275,13 @@ var tagNamesToAlwaysKeep = [
     // the following are annotated as KEEP in ctp
     "SpecificCharacterSet",
     "SOPClassUID",
-    "SeriesDate",
+    // "SeriesDate",
     "Manufacturer",
     "ManufacturerModelName",
     "RefSOPClassUID",
-    // the following are listed in CTP
+    // the following are just listed in CTP
     "ImageType",
-    "InstanceCreationTime",
+    // "InstanceCreationTime",
     "QueryRetrieveLevel",
     "RetrieveAET",
     "InstanceAvailability",
