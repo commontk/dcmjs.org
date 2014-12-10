@@ -90,6 +90,8 @@ $(function() {
   // dropped or selected by the user (the input)
   var fileSet = new Set();
   var fileSetMaxSize = 0;
+  var skippedFiles = 0;
+
   var filePathObjects = [];
   var filesByPath = {};
 
@@ -255,37 +257,54 @@ $(function() {
   // removes file from input set.
   // triggers zip creation and download when set is empty.
   var finalizeFile = function(file, mapResult, contents) {
+    function getProgress(skipPercent) {
+      return processed + " of " + fileSetMaxSize + " processed, " +
+        skippedFiles + " skipped" + (!skipPercent ? " (" + percent + "%)" : '');
+    }
 
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
 
+
     if (mapResult && mapResult.filePath) {
       var zipContents = new Uint8Array(contents);
-      status(file.name + " became " + mapResult.filePath + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
+      status(file.name + " became " + mapResult.filePath + " -- " + getProgress());
       zip.file(mapResult.filePath, zipContents, {binary: true});
+    } else {
+      // if (many) skipped files
+      skippedFiles++;
+      status(file.name + " skipped -- " + getProgress());
     }
 
     if (mapResult && mapResult.status.log.length > 0) {
       mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log});
+    } else {
+      // TODO - better args to func so full path can be shown
+      mappingLog.push({filePath: file.name, log: "skipped"});
     }
 
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
 
     if (fileSet.size === 0 || zipFull) {
-      status('Generating zip');
-      setTimeout( function() {
-        var content = zip.generate({type:"blob"});
-        // see FileSaver.js
-        var zipFileName = "organizedDICOM.zip";
-        if (zipIndex > 0) {
-          zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
-        }
-        zipIndex += 1;
-        saveAs(content, zipFileName);
-        zip = new JSZip();
-        status('Zip completed');
-      }, 0 );
+      if (Object.keys(zip.files).length) {
+        status('Generating zip');
+        setTimeout( function() {
+          var content = zip.generate({type:"blob"});
+          // see FileSaver.js
+          var zipFileName = "organizedDICOM.zip";
+          if (zipIndex > 0) {
+            zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+          }
+          zipIndex += 1;
+          saveAs(content, zipFileName);
+          zip = new JSZip();
+          status('Zip completed -- ' + getProgress());
+        }, 0 );
+      } else {
+        // everything was skipped
+        status('All skipped, no zip file created -- ' + getProgress(true))
+      }
     }
   };
 
@@ -308,6 +327,8 @@ $(function() {
     var xmlString = xmlFromDICOM(file, uploadedFilePath);
 
     if (xmlString !== null) {
+      var saveFile = true;
+
       var mapFile;
       var result = mapDom(xmlString, filePath, csvMappingTable, specificMapConfigs, {
                     print: print,
@@ -315,30 +336,38 @@ $(function() {
                     mapOptions: options.mapOptions,
                     filePathPattern: options.filePathPattern
                   });
-      var $newDicomDOM = result.dicom;
-      // new information available here:
-      // result.status.mapFailed = true if no corresponding value found in mapping table
-      // result.status.filePathFailed = true if input file path didn't match
-      //     expected file path pattern
-      // result.filePath (new file path)
-      // result.zipFileName
-      // result.status.log
 
-      // convert to dump and save
-      var dump = dicomDOMToDump($newDicomDOM);
-      FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
+      if (!options.mapOptions.keepMappingFailures && result.status.mapFailed) {
+        // mapping failed. For the risk of privacy info retained, we don't keep file
+        // by default
+        status ('skipping DICOM file because mapping failed for ' + file.name);
+        finalizeFile(file, undefined, undefined);
+      } else {
+        var $newDicomDOM = result.dicom;
+        // new information available here:
+        // result.status.mapFailed = true if no corresponding value found in mapping table
+        // result.status.filePathFailed = true if input file path didn't match
+        //     expected file path pattern
+        // result.filePath (new file path)
+        // result.zipFileName
+        // result.status.log
 
-      // perform the dump to dcm
-      dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
-      var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
+        // convert to dump and save
+        var dump = dicomDOMToDump($newDicomDOM);
+        FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
 
-      status(result.filePath + "  of size " + organizedObject.length);
-      finalizeFile(file, result, organizedObject);
+        // perform the dump to dcm
+        dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
+        var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
+
+        status(result.filePath + "  of size " + organizedObject.length);
+        finalizeFile(file, result, organizedObject);
+      }
     }
     else {
       // invalid file
       status ('skipping non-DICOM file because no raw file generated for ' + file.name);
-      finalizeFile(file, undefined, undefined); // this assumes access to global function (TODO: could be passed error cb)
+      finalizeFile(file, undefined, undefined);
     }
   };
 
