@@ -35,7 +35,50 @@ $(function() {
 
   var options = {
     maxFilesPerZip : 10000,
+    // defaults for checkbox options
+    mapOptions: {
+      // set true to avoid removing private tags
+      keepPrivateTags: false,
+      // set true for strict tag removal:
+      // remove everything in header except what dcmjs.org has as a whitelist
+      keepWhitelistedTagsOnly: false,
+      // set true to throw an error if any mapping instruction fails, i.e.
+      // the original lookup value is not found in mappingTable
+      forceMapping: false,
+      // set true to keep files where a mapping instruction failed (no lookup value found)
+      keepMappingFailures: false,
+      requireDirectoryMatch: false
+    },
+    // maybe even present the user the file path of first
+    // dicom found and ask them to enter this string below?
+    filePathPattern: 'trialname/centersubj/dicomstudyid/dicomseriesid/'
   };
+
+  // set up and link checkboxes to mapOptions dict
+  var boxesDiv = $('#checkboxes');
+  Object.keys(options.mapOptions).forEach(function(optName) {
+        var checkDiv = $('<div>');
+        boxesDiv.append(checkDiv);
+        var chbox = $('<input/>', {type: 'checkbox', id: optName, value: optName});
+        chbox.appendTo(checkDiv);
+        $('<label/>', { 'for': optName, text: optName}).appendTo(checkDiv);
+        // defaults
+        chbox.prop('checked', options.mapOptions[optName]);
+        chbox.change(function() {
+          options.mapOptions[optName] = chbox.prop('checked');
+        });
+  });
+
+  // allow editing of filepath pattern
+  var filePatternDiv = $('#filepatterndiv');
+  var filePatternInp = $('<input/>', {type: 'text', id: 'filepattern',
+    value: options.filePathPattern});
+  filePatternInp.prop('size', 70);
+  $('<label/>', { 'for': 'filepattern', text: 'folder pattern: /'}).appendTo(filePatternDiv);
+  filePatternInp.appendTo(filePatternDiv);
+  filePatternInp.on('keyup change', function() {
+    options.filePathPattern = filePatternInp.val();
+  });
 
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
@@ -55,7 +98,7 @@ $(function() {
   // utility: todo: keep a log for optional download
   var print = function(s) {
     console.log(s);
-    $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
+    // $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
   };
 
   // utility: todo: keep a log for optional download
@@ -222,7 +265,7 @@ $(function() {
     }
 
     if (mapResult && mapResult.status.log.length > 0) {
-      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log})
+      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log});
     }
 
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
@@ -264,18 +307,12 @@ $(function() {
 
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
-    // - take requireMapping from UI (skip non-mapping files vs cancel)
-    // - take requireDirectoryParsing from UI (put defaults)
-    // - take keepWhitelistedTagsOnly from UI (if true, only keeps tags in defined
-    //     tagNamesToAlwaysKeep list)
     var mapFile;
     var result = mapDom(xmlString, filePath, mapFile, {
                   print: print,
                   status: status,
-                  requireMapping: false,
-                  requireDirectoryParsing: false,
-                  keepWhitelistedTagsOnly: true,
-                  keepPrivateTags: false
+                  mapOptions: options.mapOptions,
+                  filePathPattern: options.filePathPattern
                 });
     var $newDicomDOM = result.dicom;
     // new information available here:
@@ -284,7 +321,7 @@ $(function() {
     //     expected file path pattern
     // result.filePath (new file path)
     // result.zipFileName
-    // result.log (TODO)
+    // result.status.log
 
     // convert to dump and save
     var dump = dicomDOMToDump($newDicomDOM);
@@ -296,7 +333,7 @@ $(function() {
 
     status(result.filePath + "  of size " + organizedObject.length);
     finalizeFile(file, result, organizedObject);
-  }
+  };
 
   // Used for file selection button or drop of file list
   var readSelectedFiles = function(files) {
@@ -304,7 +341,7 @@ $(function() {
       fileSet.add(file);
       dcmjs.utils.readFile(file, organize);
     });
-  }
+  };
 
 
   function fsErrorHandler(e) {
@@ -357,7 +394,7 @@ $(function() {
   }
 
   // Setup the file selector listener
-  $('#fileSelector').bind('change', handleFileSelect)
+  $('#fileSelector').bind('change', handleFileSelect);
 
   // Drag and Drop
   function handleFileDrop(e) {
@@ -538,8 +575,7 @@ $(function() {
   <div class="container">
     <h1>dcmjs organize</h1>
     <h2>Organize and anonymize dicom files in your browser (they are not sent to a server)</h2>
-
-    <h2>NOTE: this is still a work in progress and is not yet ready for routine use!</h2>
+    <h2>NOTE: this is not yet ready for routine use!</h2>
   </div>
 </header>
 
@@ -551,15 +587,16 @@ Main interface for data upload
 <div class="container">
   <section id="main_content" style="display:none;">
 
+    <div id="checkboxes"></div>
+    <div id="filepatterndiv"></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
     <input type="file" id="fileSelector" name="selectorFiles[]" multiple />
-
     <p>Or</p>
 
     <!-- Drag and Drop -->
     <div class="files_wrapper">
-      <div class="area_file" id="fileDropZone">Drop your DICOM files here
+      <div class="area_file" id="fileDropZone">Drop your DICOM files or folders here
         <div class="fileList" id="droppedFileArea">
           <table id="droppedFileList"></table>
           <div id="droppedFilePager"></div>

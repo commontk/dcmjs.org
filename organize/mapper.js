@@ -18,12 +18,6 @@ var mappingTable = [
     ['', 'wasempty', 5]
 ];
 
-// this describes the expectations of where file path components are found in case
-// they are needed for populating dicom or for saving
-// -> need to retrieve this from UI, maybe even by presenting the user the file path of first
-// dicom found and asking them to enter this string below
-var filePathPattern = 'trialname/centersubj/dicomstudyid/dicomseriesid/';
-
 // this number describes how many path components (of the PROCESSED file path) are grouped
 // in a single zip file. The zip files are labeled according to the grouping.
 var zipGroupLevel = 2;
@@ -69,7 +63,7 @@ var getSpecificReplacer = function(parser) {
 
 // (parser is created once per run)
 // TODO: var mapTable = list of lists read from mappingFilePath
-var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, options, status) {
+var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
     return {
         getMapped: function(matchValue, matchIndex, newIndex) {
             var mapRow = mapTable.filter(function(row) {
@@ -84,14 +78,16 @@ var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, opti
                       "' found in mapping table column " + matchIndex);
                 status.log.push(issue);
                 options.status(issue);
-                if (options.requireMapping) {
+                if (options.mapOptions.forceMapping) {
                   throw(issue);
                 }
             }
         },
         // compName should be in filePathCompNames
         getFilePathComp: function(compName) {
-            var filePathCompNames = filePathPattern.replace(/^\/|\/$/g, '').split('/');
+            // filePathPattern describes the expectations of where file path components are found in case
+            // they are needed for populating dicom or for saving
+            var filePathCompNames = options.filePathPattern.replace(/^\/|\/$/g, '').split('/');
             var idx = filePathCompNames.indexOf(compName);
             // slice: path starts with / and first split is ""
             var pathComps = filePath.split("/").slice(1);
@@ -106,7 +102,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, filePathPattern, opti
                 status.filePathFailed = true;
                 status.log.push(issue);
                 options.status(issue);
-                if (options.requireDirectoryParsing) {
+                if (options.mapOptions.requireDirectoryMatch) {
                     throw(issue);
                 }
                 return "invalidpath";
@@ -155,14 +151,35 @@ function tagReplace(jQDom, name, value) {
 }
 
 // example implementation
-function tagInsert(jQDom) {
+function tagAsAnonymized(jQDom, mapOptions) {
+    function optionsAsString() {
+        // need to keep the full tag under 64 chars!
+        var options = [];
+        ['keepPrivateTags', 'keepWhitelistedTagsOnly']
+            .forEach(function(optName) {
+                if (mapOptions[optName]) {
+                    options.push(optName);
+                }
+            });
+        return options.length ? ' - ' + options.join(', ') : '';
+        // return Object.keys(mapOptions).map(function(key) {
+        //     return key + ":" + mapOptions[key];
+        // }).join(", ");
+    }
+    // set Patient Identity Removed to YES
     jQDom.find("data-set").append($(
-        "<element " +
-            "name='PatientIdentityRemoved'" +
-            "tag = '0012,0062'" +
-            "vr = 'CS'" +
-        ">").append("YES"));
-    console.log("tagInsert done");
+            "<element " +
+                "name='PatientIdentityRemoved'" +
+                "tag = '0012,0062'" +
+                "vr = 'CS'" +
+            ">").append("YES"))
+    // set Deidentification method
+        .append($(
+            "<element " +
+                "name='DeIdentificationMethod'" +
+                "tag = '0012,0063'" +
+                "vr = 'LO'" +
+            ">").append("dcmjs.org" + optionsAsString()));
 }
 
 function hashUID(uid) {
@@ -246,8 +263,10 @@ function hashUID(uid) {
     return "2.25." + hexStrToBytes(nameUUID).join("");
 }
 
-
-var applyReplaceDefaults = function(jQDom, specificReplace, parser) {
+/*
+ * options - currently only passed for adding options to DICOM header after anonymization
+ */
+var applyReplaceDefaults = function(jQDom, specificReplace, parser, options) {
     function unlessSpecified(tagList) {
         return tagList.filter(function(tag) {
             return !(tag in specificReplace.dicom);
@@ -267,14 +286,7 @@ var applyReplaceDefaults = function(jQDom, specificReplace, parser) {
         tagReplace(jQDom, uidName, parser.getDicom(uidName));
     });
     // last, a few special cases
-    // FIXME:
-    tagInsert(jQDom);
-    tagReplace(jQDom, "PatientIdentityRemoved", "YES");
-    tagReplace(jQDom, "DeIdentificationMethod",
-        parser.getDicom("DeIdentificationMethod") + "; dcmjs.org");
-
-    // TODO: remove private groups and any tags here - this is currently done
-    // in index.html on parsing DICOMs (private tags are just ignored there)
+    tagAsAnonymized(jQDom, options.mapOptions);
 };
 
 var removePrivateTags = function(jQDom) {
@@ -302,17 +314,17 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 var mapDom = function(xmlString, filePath, mapFile, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
-    if (!options.requireMapping) options.requireMapping = false;
-    if (!options.requireDirectoryParsing) options.requireDirectoryParsing = false;
-    if (!options.keepWhitelistedTagsOnly) options.keepWhitelistedTagsOnly = false;
-    if (!options.keepPrivateTags) options.keepPrivateTags = false;
+    ['forceMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
+            .forEach(function(optName) {
+        if (typeof options.mapOptions[optName] == 'undefined') options.mapOptions[optName] = false;
+    });
 
     // make a DOM to query and a DOM to update
     var $oldDicomDOM = $($.parseXML(xmlString));
     var $newDicomDOM = $($.parseXML(xmlString));
 
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath, filePathPattern, options, status);
+    var parser = getParser($oldDicomDOM, mappingTable, filePath, options, status);
     var specificReplace = getSpecificReplacer(parser);
 
     // deal with specific replace instructions
@@ -326,13 +338,13 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
     var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
-    applyReplaceDefaults($newDicomDOM, specificReplace, parser);
+    applyReplaceDefaults($newDicomDOM, specificReplace, parser, options);
 
-    if (!options.keepPrivateTags) {
+    if (!options.mapOptions.keepPrivateTags) {
         removePrivateTags($newDicomDOM);
     }
 
-    if (options.keepWhitelistedTagsOnly) {
+    if (options.mapOptions.keepWhitelistedTagsOnly) {
         removeNonWhitelistedTags($newDicomDOM, tagNamesToAlwaysKeep,
             Object.keys(specificReplace.dicom), instanceUIDs);
     }
