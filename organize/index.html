@@ -16,6 +16,7 @@
     <script src="../javascripts/libs/jquery.jqGrid.min.js"></script>
     <script src="../javascripts/utils.js"></script>
 
+    <script src="jquery.csv-0.71.min.js"></script>
     <script src="sha1.js"></script>
     <script src="mapdefaults.js"></script>
     <script src="mapper.js"></script>
@@ -304,7 +305,7 @@ $(function() {
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     var mapFile;
-    var result = mapDom(xmlString, filePath, mapFile, {
+    var result = mapDom(xmlString, filePath, csvMappingTable, {
                   print: print,
                   status: status,
                   mapOptions: options.mapOptions,
@@ -388,6 +389,26 @@ $(function() {
       }
     }
   }
+
+
+  // START Dealing with mapping CSVs
+  var csvMappingTable = {header: [], data: []};
+  function handleCSVFileSelect(evt) {
+   var files = evt.target.files; // FileList object
+    var file = files[0];
+    // read the file contents
+    var reader = new FileReader();
+    reader.readAsText(file);
+    reader.onload = function(event){
+      var csv = event.target.result;
+      csvMappingTable.data = $.csv.toArrays(csv);
+      csvMappingTable.header = csvMappingTable.data.shift();
+    };
+    reader.onerror = function(){ alert('Unable to read ' + file.fileName); };
+  }
+  $('#csvfiles').bind('change', handleCSVFileSelect);
+  // END Dealing with mapping CSVs
+
 
   // Setup the file selector listener
   $('#fileSelector').bind('change', handleFileSelect);
@@ -583,6 +604,7 @@ Main interface for data upload
 
     <div id="checkboxes"></div>
     <div id="filepatterndiv"></div>
+    <div><p>Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
     <input type="file" id="fileSelector" name="selectorFiles[]" multiple />
