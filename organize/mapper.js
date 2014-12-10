@@ -21,6 +21,8 @@ var replaceUIDs = instanceUIDs;
 
 var specificMappingExample = "dicom = {\n" +
 "// List DICOM Header tags for which you want to change values:\n" +
+"// It's important to assign something to PatientName and PatientID as otherwise\n" +
+"// they will just get emptied by the default behaviour\n" +
 "    'PatientName': function() {\n" +
 "        // set to a static value\n" +
 "        // return 'myID';\n" +
