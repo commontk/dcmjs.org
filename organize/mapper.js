@@ -11,13 +11,6 @@
 
 // - bug: if in getSpeificReplacer.dicom: 'TagName': function() {return "mystring"} doesn't ADD the tag if not there.
 
-// example setup
-var mappingTable = [
-    ['anonymous', 'mappedname', 1],
-    ['2766852498', 'AnonymousPatient', 1],
-    ['', 'wasempty', 5]
-];
-
 // this number describes how many path components (of the PROCESSED file path) are grouped
 // in a single zip file. The zip files are labeled according to the grouping.
 var zipGroupLevel = 2;
@@ -30,17 +23,20 @@ var replaceUIDs = instanceUIDs;
 var getSpecificReplacer = function(parser) {
     return {
         dicom: {
-            // just set a date
-            'PatientID': function() {
-                return "newID";
-            },
+            // 'PatientID': function() {
+            //     return "newID";
+            // },
             // this example replaces the patient name per mapping table columns 0 (original) and 1 (target)
-            'PatientName': function() {
-                return parser.getMapped(parser.getDicom('PatientName'), 0, 1);
+            'PatientID': function() {
+                var pn = parser.getDicom('PatientID');
+                var okPn = pn.slice(0, 3) + "_" + pn.slice(3, 7);
+                return parser.getMapping(okPn, 'CURRID', 'NEWID');
             },
             // this example finds the patientname in mapping table column 0 and offsets the date by days per column 2
             'StudyDate': function() {
-                return addDays(parser.getDicom('StudyDate'), parser.getMapped(parser.getDicom('PatientName'), 0, 2));
+                var pn = parser.getDicom('PatientID');
+                var okPn = pn.slice(0, 3) + "_" + pn.slice(3, 7);
+                return addDays(parser.getDicom('StudyDate'), parser.getMapping(okPn, 'CURRID', 'DATEOFFSET'));
             },
         },
         // filePath lists the component of the new path. Component names if taken from old filePath must
@@ -64,9 +60,14 @@ var getSpecificReplacer = function(parser) {
 // (parser is created once per run)
 // TODO: var mapTable = list of lists read from mappingFilePath
 var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
+    var csvHeaders = mapTable.header;
+    var csvData = mapTable.data;
     return {
-        getMapped: function(matchValue, matchIndex, newIndex) {
-            var mapRow = mapTable.filter(function(row) {
+        getMapping: function(matchValue, matchHeader, mapHeader) {
+            var matchIndex = csvHeaders.indexOf(matchHeader);
+            var newIndex = csvHeaders.indexOf(mapHeader);
+
+            var mapRow = csvData.filter(function(row) {
                 return row[matchIndex] === matchValue;
             });
             if (mapRow.length) {
@@ -311,7 +312,7 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 
 // in main func:
 // read from old dicom dom and write to new dicomdom
-var mapDom = function(xmlString, filePath, mapFile, options) {
+var mapDom = function(xmlString, filePath, csvMappingTable, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
     ['forceMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
@@ -324,7 +325,7 @@ var mapDom = function(xmlString, filePath, mapFile, options) {
     var $newDicomDOM = $($.parseXML(xmlString));
 
     // TODO: define filePath - should come in arguments
-    var parser = getParser($oldDicomDOM, mappingTable, filePath, options, status);
+    var parser = getParser($oldDicomDOM, csvMappingTable, filePath, options, status);
     var specificReplace = getSpecificReplacer(parser);
 
     // deal with specific replace instructions
