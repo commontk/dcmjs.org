@@ -19,41 +19,51 @@ var zipGroupLevel = 2;
 var defaultEmpty = tagNamesToEmpty;
 var replaceUIDs = instanceUIDs;
 
+var specificMappingExample = "dicom = {\n" +
+"// List DICOM Header tags for which you want to change values:\n" +
+"    'PatientName': function() {\n" +
+"        // set to a static value\n" +
+"        // return 'myID';\n" +
+"        // OR set to header value of same DICOM instance\n" +
+"        // return parser.getDicom('PatientID')\n" +
+"        // OR set to a component of the files directory path\n" +
+"        return parser.getFilePathComp('centersubj');\n" +
+"    },\n" +
+"    // this example replaces the patient name per mapping table column labeled 'CURR_ID' (original)\n" +
+"    // and 'NEW_ID' (target)\n" +
+"    'PatientID': function() {\n" +
+"        return parser.getMapping(parser.getDicom('PatientID'), 'CURR_ID', 'NEW_ID');\n" +
+"    },\n" +
+"    // this example finds the patientname in mapping table column 0 and offsets the CONTENTDATE by days per column 2\n" +
+"    'ContentDate': function() {\n" +
+"        return addDays(parser.getDicom('StudyDate'), parser.getMapping(\n" + 
+"            parser.getDicom('PatientID'), 'CURR_ID', 'DATE_OFFSET'));\n" +
+"    },\n" +
+"};\n" +
+"// filePath lists the components of the new path to be written.\n" +
+"// If taken from old path, component names must be available in filePathPattern,\n" +
+"// and actual file path must be deep enough for getFilePathComp to find its match\n" +
+"filePath = [\n" +
+"    parser.getFilePathComp('trialname'),\n" +
+"    parser.getFilePathComp('centersubj') + '_OR_' + parser.getDicom('PatientID'),\n" +
+"    parser.getDicom('StudyDate'),\n" +
+"    parser.getDicom('SeriesDescription') + '_' + parser.getDicom('SeriesNumber'),\n" +
+"    parser.getDicom('InstanceNumber') + '.dcm'\n" +
+"];";
+
+
+
 // TODO: extract below specific instructions from UI
-var getSpecificReplacer = function(parser) {
-    return {
-        dicom: {
-            // 'PatientID': function() {
-            //     return "newID";
-            // },
-            // this example replaces the patient name per mapping table columns 0 (original) and 1 (target)
-            'PatientID': function() {
-                var pn = parser.getDicom('PatientID');
-                var okPn = pn.slice(0, 3) + "_" + pn.slice(3, 7);
-                return parser.getMapping(okPn, 'CURRID', 'NEWID');
-            },
-            // this example finds the patientname in mapping table column 0 and offsets the date by days per column 2
-            'StudyDate': function() {
-                var pn = parser.getDicom('PatientID');
-                var okPn = pn.slice(0, 3) + "_" + pn.slice(3, 7);
-                return addDays(parser.getDicom('StudyDate'), parser.getMapping(okPn, 'CURRID', 'DATEOFFSET'));
-            },
-        },
-        // filePath lists the component of the new path. Component names if taken from old filePath must
-        // be available in filePathPattern, and actual file path depth must obviously be greater than
-        // the index at which the argument to getFilePathComp() is found in filePathPattern
-        filePath: [
-            parser.getFilePathComp('trialname'),
-            // TODO: this gets access to the old/non-mapped PatientID. Compare also the getDicom for UIDs.
-            // probably mapping layer should be more orthogonal to spcific replace functions,
-            // and instead, getter functions always retrieve mapped values.
-            // Also, distinguish case of mapping vs just entering new tag content via specificReplacer
-            parser.getFilePathComp('centersubj') + "_" + parser.getDicom('PatientID'),
-            parser.getDicom('StudyDate'),
-            parser.getDicom('SeriesDescription') + "_" + parser.getDicom('SeriesNumber'),
-            parser.getDicom('InstanceNumber') + ".dcm"
-        ]
-    };
+var getSpecificReplacer = function(parser, specificMapConfigs) {
+    try {
+        var f = new Function('parser', 'var dicom, filePath; ' +
+                specificMapConfigs +
+                '\nreturn {dicom: dicom, filePath: filePath};');
+        return f(parser);
+    }
+    catch(e) {
+        throw('invalid mapping instructions found in editor:\n' + e.toString());
+    }
 };
 
 
@@ -124,13 +134,17 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
 
 
 function addDays(dcmDate, numDays) {
+    var dcmFormat = "YYYYMMDD";
     // just to make sure
     dcmDate = String(dcmDate);
-    // month is 0 based!
-    var origDate = new Date(dcmDate.substring(0,4), dcmDate.substring(4, 6) - 1, dcmDate.substring(6, 8));
-    var newDate = new Date(origDate);
-    newDate.setDate(newDate.getDate() + numDays);
-    return newDate.getFullYear() + ('0' + String(parseInt(newDate.getMonth(), 10) + 1)).slice(-2) + ('0' + newDate.getDate()).slice(-2);
+    // // month is 0 based!
+    // var origDate = new Date(dcmDate.substring(0,4), dcmDate.substring(4, 6) - 1, dcmDate.substring(6, 8));
+    // var newDate = new Date(origDate);
+    // newDate.setDate(newDate.getDate() + numDays);
+    // return newDate.getFullYear() + ('0' + String(parseInt(newDate.getMonth(), 10) + 1)).slice(-2) + ('0' + newDate.getDate()).slice(-2);
+
+    var currDate = moment(dcmDate, dcmFormat);
+    return currDate.add(numDays, 'days').format(dcmFormat);
 }
 
 // make file path components file system safe
@@ -312,7 +326,7 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 
 // in main func:
 // read from old dicom dom and write to new dicomdom
-var mapDom = function(xmlString, filePath, csvMappingTable, options) {
+var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
     ['forceMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
@@ -326,7 +340,7 @@ var mapDom = function(xmlString, filePath, csvMappingTable, options) {
 
     // TODO: define filePath - should come in arguments
     var parser = getParser($oldDicomDOM, csvMappingTable, filePath, options, status);
-    var specificReplace = getSpecificReplacer(parser);
+    var specificReplace = getSpecificReplacer(parser, specificMapConfigs);
 
     // deal with specific replace instructions
     // the specific replace instructions are the the place where

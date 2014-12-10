@@ -16,7 +16,12 @@
     <script src="../javascripts/libs/jquery.jqGrid.min.js"></script>
     <script src="../javascripts/utils.js"></script>
 
+    <!-- csv reading -->
     <script src="jquery.csv-0.71.min.js"></script>
+    <!-- providing specific anonymization instructions  -->
+    <script src="https://cdn.jsdelivr.net/ace/1.1.7/min/ace.js"></script>
+    <!-- working with JS dates correctly -->
+    <script src="moment.min.js"></script>
     <script src="sha1.js"></script>
     <script src="mapdefaults.js"></script>
     <script src="mapper.js"></script>
@@ -309,7 +314,7 @@ $(function() {
     // TODO:
     // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
     var mapFile;
-    var result = mapDom(xmlString, filePath, csvMappingTable, {
+    var result = mapDom(xmlString, filePath, csvMappingTable, specificMapConfigs, {
                   print: print,
                   status: status,
                   mapOptions: options.mapOptions,
@@ -413,6 +418,24 @@ $(function() {
   }
   $('#csvfiles').bind('change', handleCSVFileSelect);
   // END Dealing with mapping CSVs
+
+  // START EDITOR TO ENTER SPECIFIC INSTRUCTIONS
+  var specificMapConfigs = specificMappingExample;
+
+  var anonEditor = ace.edit(anonedit);
+  anonEditor.setValue(specificMapConfigs, 1);
+  // specificMappingExample: in mapper.js
+  anonEditor.setOptions({
+      minLines: 5,
+      maxLines: 15
+  });
+  anonEditor.getSession().setMode("ace/mode/javascript");
+  anonEditor.setTheme("ace/theme/tomorrow_night");
+  anonEditor.getSession().on('change', function(e) {
+      specificMapConfigs = anonEditor.getValue();
+  });
+  // END EDITOR TO ENTER SPECIFIC INSTRUCTIONS
+
 
 
   // Setup the file selector listener
@@ -619,9 +642,14 @@ Main interface for data upload
 <div class="container">
   <section id="main_content" style="display:none;">
 
+    <!-- checkboxes and folder path mapping -->
     <div id="checkboxes"></div>
     <div id="filepatterndiv"></div>
+    <!-- CSV map file -->
     <div><p>Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
+    <!-- Specific anon/mapping instructions -->
+    <div><p>Add specific anonymization instructions inside the editor</p></div>
+    <div id="anonedit"></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
     <input type="file" id="fileSelector" name="selectorFiles[]" multiple />
