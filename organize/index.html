@@ -41,7 +41,7 @@ $(function() {
   // dropped or selected by the user (the input)
   var fileSet = new Set();
   var fileSetMaxSize = 0;
-  var filePaths = [];
+  var filePathObjects = [];
   var filesByPath = {};
 
   // log of the processing activities
@@ -51,7 +51,6 @@ $(function() {
   // DICOM data (the output)
   var zip = new JSZip();
   var zipIndex = 0;
-
 
   // utility: todo: keep a log for optional download
   var print = function(s) {
@@ -211,18 +210,23 @@ $(function() {
   // removes file from input set.
   // triggers zip creation and download when set is empty.
   var finalizeFile = function(file, mapResult, contents) {
+
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
+
     if (mapResult && mapResult.filePath) {
       var zipContents = new Uint8Array(contents);
       status(file.name + " became " + mapResult.filePath + " -- " + processed + " of " + fileSetMaxSize + " processed (" + percent + "%)");
       zip.file(mapResult.filePath, zipContents, {binary: true});
     }
+
     if (mapResult && mapResult.status.log.length > 0) {
       mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log})
     }
+
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
+
     if (fileSet.size === 0 || zipFull) {
       status('Generating zip');
       setTimeout( function() {
@@ -372,7 +376,7 @@ $(function() {
       var fileConsumer = function(file, fullPath) {
         fileSet.add(file);
         filesByPath[fullPath] = file;
-        filePaths.push({path: fullPath});
+        filePathObjects.push({path: fullPath});
         file.filePath = fullPath;
         fileSetMaxSize = fileSet.size;
         status("found " + fileSetMaxSize + " files so far");
@@ -380,7 +384,11 @@ $(function() {
 
       var doneCallback = function() {
         fileSetMaxSize = fileSet.size;
-        $('#droppedFileList').jqGrid('addRowData', 0, filePaths);
+        if (filePathObjects.length < 1000) {
+          $('#droppedFileList').jqGrid('addRowData', 0, filePathObjects);
+        } else {
+          $('#droppedFileList').jqGrid('addRowData', 0, "Over 1000 files");
+        }
         status(fileSetMaxSize + " files found for processing");
         $('.fileButtons').attr('disabled', false);
       }
@@ -482,14 +490,12 @@ $(function() {
     cleanupBeforeProcessing();
     $('.fileButtons').attr('disabled', true);
     fileSetMaxSize = fileSet.size;
-    var fileGrid = JSON.parse($('#droppedFileList').jqGrid('jqGridExport', {exptype: 'jsonstring'}));
-    var gridRows = fileGrid.grid.data;
-    var processingGenerator = (function(gridRows) {
+    var processingGenerator = (function(filePathObjects) {
       return function() {
-        var gridRow = gridRows.pop();
-        if (gridRow && gridRow.path) {
+        var filePathObject = filePathObjects.pop();
+        if (filePathObject && filePathObject.path) {
           // process one path
-          var filePath = gridRow.path;
+          var filePath = filePathObject.path;
           dcmjs.utils.readFile(filesByPath[filePath], organize, filePath);
           setTimeout(processingGenerator, 5);
         } else {
@@ -509,7 +515,7 @@ $(function() {
           }
         }
       };
-    })(gridRows);
+    })(filePathObjects);
     processingGenerator();
   });
 
