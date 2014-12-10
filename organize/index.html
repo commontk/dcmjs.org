@@ -122,9 +122,7 @@ $(function() {
     file.name, dcmjs.utils.execute('dcm2xml', ['--load-all', '--encode-base64', '--write-binary-data', filePath, xmlFilePath]);
     file.name, dcmjs.utils.execute('dcm2xml', [filePath, xmlFilePath]);
     if (!dcmjs.utils.fileExists(xmlFilePath)) {
-      status ('skipping non-DICOM file because no xml generated for ' + file.name);
-      finalizeFile(file);
-      return;
+      return null;
     }
     var xmlString = FS.readFile(xmlFilePath, {encoding: 'utf8'} );
     dcmjs.utils.deleteFiles([xmlFilePath]);
@@ -224,9 +222,7 @@ $(function() {
 
     var rawFilePath = filePath + ".0.raw";
     if (!dcmjs.utils.fileExists(rawFilePath)) {
-      status ('skipping non-DICOM file because no raw file generated for ' + file.name);
-      finalizeFile(file); // this assumes access to global function (TODO: could be passed error cb)
-      return;
+      return null;
     }
 
     return (dumpToXML(dumpLines));
@@ -311,34 +307,39 @@ $(function() {
 
     var xmlString = xmlFromDICOM(file, uploadedFilePath);
 
-    // TODO:
-    // - pass mapping table from uploaded file (currently statis list in mapconfig.js)
-    var mapFile;
-    var result = mapDom(xmlString, filePath, csvMappingTable, specificMapConfigs, {
-                  print: print,
-                  status: status,
-                  mapOptions: options.mapOptions,
-                  filePathPattern: options.filePathPattern
-                });
-    var $newDicomDOM = result.dicom;
-    // new information available here:
-    // result.status.mapFailed = true if no corresponding value found in mapping table
-    // result.status.filePathFailed = true if input file path didn't match
-    //     expected file path pattern
-    // result.filePath (new file path)
-    // result.zipFileName
-    // result.status.log
+    if (xmlString !== null) {
+      var mapFile;
+      var result = mapDom(xmlString, filePath, csvMappingTable, specificMapConfigs, {
+                    print: print,
+                    status: status,
+                    mapOptions: options.mapOptions,
+                    filePathPattern: options.filePathPattern
+                  });
+      var $newDicomDOM = result.dicom;
+      // new information available here:
+      // result.status.mapFailed = true if no corresponding value found in mapping table
+      // result.status.filePathFailed = true if input file path didn't match
+      //     expected file path pattern
+      // result.filePath (new file path)
+      // result.zipFileName
+      // result.status.log
 
-    // convert to dump and save
-    var dump = dicomDOMToDump($newDicomDOM);
-    FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
+      // convert to dump and save
+      var dump = dicomDOMToDump($newDicomDOM);
+      FS.writeFile('./dump.txt', dump, {encoding: 'utf8'} );
 
-    // perform the dump to dcm
-    dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
-    var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
+      // perform the dump to dcm
+      dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
+      var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
-    status(result.filePath + "  of size " + organizedObject.length);
-    finalizeFile(file, result, organizedObject);
+      status(result.filePath + "  of size " + organizedObject.length);
+      finalizeFile(file, result, organizedObject);
+    }
+    else {
+      // invalid file
+      status ('skipping non-DICOM file because no raw file generated for ' + file.name);
+      finalizeFile(file, undefined, undefined); // this assumes access to global function (TODO: could be passed error cb)
+    }
   };
 
   // Used for file selection button or drop of file list

@@ -31,6 +31,8 @@ var instanceUIDs = [
 ];
 
 var tagNamesToEmpty = [
+    // 0/3: seems to be missing in CTP
+    "SeriesDate",
     // cat 1/3: CTP: set to empty explicitely using @empty
     "StudyTime",
     "ContentTime",

@@ -36,7 +36,7 @@ var specificMappingExample = "dicom = {\n" +
 "    },\n" +
 "    // this example finds the patientname in mapping table column 0 and offsets the CONTENTDATE by days per column 2\n" +
 "    'ContentDate': function() {\n" +
-"        return addDays(parser.getDicom('StudyDate'), parser.getMapping(\n" + 
+"        return parser.addDays(parser.getDicom('StudyDate'), parser.getMapping(\n" + 
 "            parser.getDicom('PatientID'), 'CURR_ID', 'DATE_OFFSET'));\n" +
 "    },\n" +
 "};\n" +
@@ -86,7 +86,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 status.mapFailed = true;
                 // TODO: create a downloadable log
                 var issue = ("No value '" + matchValue +
-                      "' found in mapping table column " + matchIndex);
+                      "' found in mapping table column " + matchHeader);
                 status.log.push(issue);
                 options.status(issue);
                 if (options.mapOptions.forceMapping) {
@@ -128,24 +128,27 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 ret = hashUID(ret);
             }
             return ret;
+        },
+
+        // function is parked here for the access to status. Will likely change
+        addDays: function(dcmDate, numDays) {
+            var dcmFormat = "YYYYMMDD";
+            // just to make sure
+            dcmDate = String(dcmDate);
+            var currDate = moment(dcmDate, dcmFormat);
+            if (!currDate.isValid()) {
+                var issue = "No valid date found when trying to add days in mapper";
+                status.log.push(issue);
+                options.status(issue);
+                return "";
+            }
+            else {
+                return currDate.add(numDays, 'days').format(dcmFormat);
+            }
         }
     };
 };
 
-
-function addDays(dcmDate, numDays) {
-    var dcmFormat = "YYYYMMDD";
-    // just to make sure
-    dcmDate = String(dcmDate);
-    // // month is 0 based!
-    // var origDate = new Date(dcmDate.substring(0,4), dcmDate.substring(4, 6) - 1, dcmDate.substring(6, 8));
-    // var newDate = new Date(origDate);
-    // newDate.setDate(newDate.getDate() + numDays);
-    // return newDate.getFullYear() + ('0' + String(parseInt(newDate.getMonth(), 10) + 1)).slice(-2) + ('0' + newDate.getDate()).slice(-2);
-
-    var currDate = moment(dcmDate, dcmFormat);
-    return currDate.add(numDays, 'days').format(dcmFormat);
-}
 
 // make file path components file system safe
 var cleanFilePath = function(arr) {
