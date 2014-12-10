@@ -355,6 +355,7 @@ $(function() {
     // Create a new zip archive
     zip = new JSZip();
     fileSetMaxSize = 0;
+    mappingLog = [];
   }
 
 
@@ -518,6 +519,7 @@ $(function() {
     cleanupBeforeProcessing();
     $('#droppedFileList').jqGrid('clearGridData');
     $('.fileButtons').attr('disabled', true);
+    $('.mappingLogButtons').attr('disabled', true);
     fileSet.clear();
     status('List cleared');
   });
@@ -526,6 +528,7 @@ $(function() {
   $("#processFiles").click(function(){
     cleanupBeforeProcessing();
     $('.fileButtons').attr('disabled', true);
+    $('.mappingLogButtons').attr('disabled', true);
     fileSetMaxSize = fileSet.size;
     var processingGenerator = (function(filePathObjects) {
       return function() {
@@ -543,10 +546,8 @@ $(function() {
           $('.fileButtons').attr('disabled', false);
           zipIndex = 0;
           if (mappingLog.length > 0) {
-            printToMainContext('The following messages were generated during the mapping:  ');
-            $.each(mappingLog, function (index, logEntry) {
-              printToMainContext(logEntry.filePath + ": " + logEntry.log);
-            });
+            printToMainContext('Messages were generated during the mapping.  Download mapping log to view.');
+            $('#downloadMappingLog').attr('disabled', false);
           } else {
             printToMainContext('No messages were generated during the mapping.');
           }
@@ -554,6 +555,16 @@ $(function() {
       };
     })(filePathObjects);
     processingGenerator();
+  });
+
+  // get a text file of the current mapping log
+  $("#downloadMappingLog").click(function(){
+    var logText = "";
+    $.each(mappingLog, function (index, logEntry) {
+      logText += logEntry.filePath + ": " + logEntry.log + "\n";
+    });
+    var logBlob = new Blob([logText], {type: "text/plain;charset=utf-8"});
+    saveAs(logBlob, "mappingLog.txt");
   });
 
 
@@ -604,6 +615,7 @@ Main interface for data upload
       </div>
       <input type="BUTTON" class="fileButtons" id="processFiles" value="Process Files" disabled=true />
       <input type="BUTTON" class="fileButtons" id="clearFiles" value="Clear Files" disabled=true />
+      <input type="BUTTON" class="mappingLogButtons" id="downloadMappingLog" value="Download Mapping Log" disabled=true />
     </div>
 
     <p id='status'>Waiting...</p>
