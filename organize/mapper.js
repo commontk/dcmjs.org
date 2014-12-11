@@ -91,9 +91,6 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                       "' found in mapping table column " + matchHeader);
                 status.log.push(issue);
                 options.status(issue);
-                if (options.mapOptions.forceMapping) {
-                  throw(issue);
-                }
             }
         },
         // compName should be in filePathCompNames
@@ -155,7 +152,10 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
 // make file path components file system safe
 var cleanFilePath = function(arr) {
     return arr.map(function(comp) {
-        return encodeURIComponent(comp.replace(/[ \/]/g, '_')) || "unavailable";
+        if (typeof comp == 'undefined' || comp == '') {
+            comp = 'unavailable';            
+        }
+        return encodeURIComponent(comp.replace(/[ \/]/g, '_'));
     });
 };
 
@@ -334,7 +334,7 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, options) {
     var status = {log: [], mapFailed: false};
     options = options || {};
-    ['forceMapping', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
+    ['requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
             .forEach(function(optName) {
         if (typeof options.mapOptions[optName] == 'undefined') options.mapOptions[optName] = false;
     });

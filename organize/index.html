@@ -48,10 +48,9 @@ $(function() {
       // set true for strict tag removal:
       // remove everything in header except what dcmjs.org has as a whitelist
       keepWhitelistedTagsOnly: false,
-      // set true to throw an error if any mapping instruction fails, i.e.
-      // the original lookup value is not found in mappingTable
-      forceMapping: false,
       // set true to keep files where a mapping instruction failed (no lookup value found)
+      // the default is false because files failing mapping instructions can leak private
+      // information. (and if no mapping is specified in editor, this is not relevant)
       keepMappingFailures: false,
       requireDirectoryMatch: false
     },
