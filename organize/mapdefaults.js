@@ -37,6 +37,8 @@ var tagNamesToEmpty = [
     "PatientID",
     "PatientName",
     "AccessionNumber",
+    // (valuable, but sometimes manually filled)
+    "SeriesDescription",
     // cat 1/3: CTP: set to empty explicitely using @empty
     "StudyTime",
     "ContentTime",
@@ -270,8 +272,6 @@ var tagNamesToAlwaysKeep = [
     "PatientIdentityRemoved",
     "DeIdentificationMethod",
     "PixelData",
-    // this one is considered OK by us because it usually has very relevant info
-    "SeriesDescription",
     "SoftwareVersions",
     "ImagePositionPatient",
     "ImageOrientationPatient",

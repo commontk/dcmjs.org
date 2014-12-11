@@ -286,6 +286,7 @@ $(function() {
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
 
     if (fileSet.size === 0 || zipFull) {
+      // this check prevents empty datasets to be written (e.g. if all files skipped)
       if (Object.keys(zip.files).length) {
         status('Generating zip');
         setTimeout( function() {
@@ -389,6 +390,7 @@ $(function() {
     $('#main_content p.output').remove();
     // Create a new zip archive
     zip = new JSZip();
+    zipIndex = 0;
     fileSetMaxSize = 0;
     mappingLog = [];
   }
@@ -617,7 +619,7 @@ $(function() {
           // - reset processing-related global variables
           // - print result to page
           $('.fileButtons').attr('disabled', false);
-          zipIndex = 0;
+          // zipIndex = 0;
           if (mappingLog.length > 0) {
             printToMainContext('Messages were generated during the mapping.  Download mapping log to view.');
             $('#downloadMappingLog').attr('disabled', false);

@@ -87,7 +87,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
             } else {
                 status.mapFailed = true;
                 // TODO: create a downloadable log
-                var issue = ("No value '" + matchValue +
+                var issue = ("Warning: No value '" + matchValue +
                       "' found in mapping table column " + matchHeader);
                 status.log.push(issue);
                 options.status(issue);
@@ -104,10 +104,10 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
             if (idx == -1 || idx >= pathComps.length) {
                 var issue;
                 if (idx == -1) {
-                    issue = "path component name not found in component names list";
+                    issue = "Warning: path component name not found in component names list";
                 }
                 if (idx >= pathComps.length) {
-                    issue = "the specified path component is deeper than the available directory hierarchy";
+                    issue = "Warning: the specified path component is deeper than the available directory hierarchy";
                 }
                 status.filePathFailed = true;
                 status.log.push(issue);
@@ -136,7 +136,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
             dcmDate = String(dcmDate);
             var currDate = moment(dcmDate, dcmFormat);
             if (!currDate.isValid()) {
-                var issue = "No valid date found when trying to add days in mapper";
+                var issue = "Warning: no valid date found when trying to add days in mapper";
                 status.log.push(issue);
                 options.status(issue);
                 return "";
@@ -162,7 +162,10 @@ var cleanFilePath = function(arr) {
 // tag manipulation functions
 // empty if present
 function tagEmpty(jQDom, name) {
-    jQDom.find('[name=' + name + ']').text("");
+    var el = jQDom.find('[name=' + name + ']');
+    var hadContent = !!el.text();
+    el.text("");
+    return hadContent;
 }
 
 function tagReplace(jQDom, name, value) {
@@ -286,7 +289,7 @@ function hashUID(uid) {
 /*
  * options - currently only passed for adding options to DICOM header after anonymization
  */
-var applyReplaceDefaults = function(jQDom, specificReplace, parser, options) {
+var applyReplaceDefaults = function(jQDom, specificReplace, parser, options, status) {
     function unlessSpecified(tagList) {
         return tagList.filter(function(tag) {
             return !(tag in specificReplace.dicom);
@@ -295,7 +298,12 @@ var applyReplaceDefaults = function(jQDom, specificReplace, parser, options) {
     // empty all tags in defaultEmpty, unless there's a specific instruction
     // to do something else
     unlessSpecified(defaultEmpty).forEach(function(name) {
-        tagEmpty(jQDom, name);
+        var hadContent = tagEmpty(jQDom, name);
+        if (hadContent) {
+            var info = ("Info: Emptying tag <" + name + ">");
+            status.log.push(info);
+            // options.status(info);
+        }
     });
     // hash all UIDs in replaceUID, unless there's a specific instruction
     // to do something else
@@ -358,7 +366,7 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
     var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
     var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
-    applyReplaceDefaults($newDicomDOM, specificReplace, parser, options);
+    applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);
 
     if (!options.mapOptions.keepPrivateTags) {
         removePrivateTags($newDicomDOM);
