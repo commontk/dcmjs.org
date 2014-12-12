@@ -255,7 +255,8 @@ $(function() {
   // adds contents to zip object at specified path.
   // removes file from input set.
   // triggers zip creation and download when set is empty.
-  var finalizeFile = function(file, mapResult, contents) {
+  // zipFileID not yet used
+  var finalizeFile = function(file, mapResult, contents, zipFileID) {
     function getProgress(skipPercent) {
       return processed + " of " + fileSetMaxSize + " processed, " +
         skippedFiles + " skipped" + (!skipPercent ? " (" + percent + "%)" : '');
@@ -283,27 +284,32 @@ $(function() {
       mappingLog.push({filePath: file.name, log: "skipped"});
     }
 
-    var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
+    var numFilesToZip = Object.keys(zip.files).length;
+    var zipFull = numFilesToZip >= options.maxFilesPerZip;
 
     if (fileSet.size === 0 || zipFull) {
       // this check prevents empty datasets to be written (e.g. if all files skipped)
-      if (Object.keys(zip.files).length) {
+      if (numFilesToZip) {
         status('Generating zip');
-        setTimeout( function() {
+        setTimeout( function(args) {
+          var zipFileID = args[0], zipIndex = args[1];
           var content = zip.generate({type:"blob"});
           // see FileSaver.js
           var zipFileName = "organizedDICOM.zip";
+          // var zipFileName = zipFileID;
           if (zipIndex > 0) {
             zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
+            // zipFileName = zipFileName + "-continuation"+zipIndex;
           }
-          zipIndex += 1;
+          // zipFileName += ".zip";
           saveAs(content, zipFileName);
+          zipIndex += 1;
           zip = new JSZip();
-          status('Zip completed -- ' + getProgress());
-        }, 0 );
+          status('Zip ' + zipFileName + ' completed -- ' + getProgress());
+        }, 0, [zipFileID, zipIndex]);
       } else {
         // everything was skipped
-        status('All skipped, no zip file created -- ' + getProgress(true))
+        status('All skipped, no zip file created -- ' + getProgress(true));
       }
     }
   };
@@ -341,7 +347,7 @@ $(function() {
         // mapping failed. For the risk of privacy info retained, we don't keep file
         // by default
         status ('skipping DICOM file because mapping failed for ' + file.name);
-        finalizeFile(file, undefined, undefined);
+        finalizeFile(file, undefined, undefined, undefined);
       } else {
         var $newDicomDOM = result.dicom;
         // new information available here:
@@ -349,7 +355,7 @@ $(function() {
         // result.status.filePathFailed = true if input file path didn't match
         //     expected file path pattern
         // result.filePath (new file path)
-        // result.zipFileName
+        // result.zipFileID
         // result.status.log
 
         // convert to dump and save
@@ -361,13 +367,13 @@ $(function() {
         var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
 
         status(result.filePath + "  of size " + organizedObject.length);
-        finalizeFile(file, result, organizedObject);
+        finalizeFile(file, result, organizedObject, result.zipFileID);
       }
     }
     else {
       // invalid file
       status ('skipping non-DICOM file because no raw file generated for ' + file.name);
-      finalizeFile(file, undefined, undefined);
+      finalizeFile(file, undefined, undefined, undefined);
     }
   };
 

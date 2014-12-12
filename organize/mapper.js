@@ -1,15 +1,10 @@
 // FIXMEs:
+// - if in getSpecificReplacer.dicom: 'TagName': function() {return "mystring"} doesn't ADD the tag if not there.
 // - clone $dicomDOM more easily
-// - need a function to create NEW tags in $dicomDOM (see broken implementation in mapDom function)
-// - remove private tags unless specified OK (temp solution)
-// - optional selector to remove everything that's not in tagNamesToAlwaysKeep (mapdefaults.js)
-//  --> keep special tags! and just check "element" kids of "data-set" (leave meta-header alone)
-//   (these tags are defined, but no logic exists yet)
 // - verify hashUID function
-// - pass filepaths
-// - pass a mapfile
 
-// - bug: if in getSpeificReplacer.dicom: 'TagName': function() {return "mystring"} doesn't ADD the tag if not there.
+// NOTE: not writing into options.status because of performance reasons
+
 
 // this number describes how many path components (of the PROCESSED file path) are grouped
 // in a single zip file. The zip files are labeled according to the grouping.
@@ -64,7 +59,7 @@ var getSpecificReplacer = function(parser, specificMapConfigs) {
         return f(parser);
     }
     catch(e) {
-        throw('invalid mapping instructions found in editor:\n' + e.toString());
+        throw('invalid mapping instructions in editor:\n' + e.toString());
     }
 };
 
@@ -90,7 +85,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 var issue = ("Warning: No value '" + matchValue +
                       "' found in mapping table column " + matchHeader);
                 status.log.push(issue);
-                options.status(issue);
+                // options.status(issue);
             }
         },
         // compName should be in filePathCompNames
@@ -111,7 +106,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
                 }
                 status.filePathFailed = true;
                 status.log.push(issue);
-                options.status(issue);
+                // options.status(issue);
                 if (options.mapOptions.requireDirectoryMatch) {
                     throw(issue);
                 }
@@ -138,7 +133,7 @@ var getParser = function($oldDicomDom, mapTable, filePath, options, status) {
             if (!currDate.isValid()) {
                 var issue = "Warning: no valid date found when trying to add days in mapper";
                 status.log.push(issue);
-                options.status(issue);
+                // options.status(issue);
                 return "";
             }
             else {
@@ -300,7 +295,7 @@ var applyReplaceDefaults = function(jQDom, specificReplace, parser, options, sta
     unlessSpecified(defaultEmpty).forEach(function(name) {
         var hadContent = tagEmpty(jQDom, name);
         if (hadContent) {
-            var info = ("Info: Emptying tag <" + name + ">");
+            var info = ("Info: Emptying <" + name + ">");
             status.log.push(info);
             // options.status(info);
         }
@@ -364,7 +359,7 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
 
     // find new path:
     var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
-    var zipFileName = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
+    var zipFileID = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
 
     applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);
 
@@ -381,6 +376,6 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
         dicom: $newDicomDOM,
         status: status,
         filePath: newFilePath,
-        zipFileName: zipFileName
+        zipFileID: zipFileID
     };
 };
