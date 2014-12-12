@@ -101,6 +101,7 @@ $(function() {
   // DICOM data (the output)
   var zip = new JSZip();
   var zipIndex = 0;
+  var prevZipFileID = '';
 
   // utility: todo: keep a log for optional download
   var print = function(s) {
@@ -255,12 +256,46 @@ $(function() {
   // adds contents to zip object at specified path.
   // removes file from input set.
   // triggers zip creation and download when set is empty.
-  // zipFileID not yet used
   var finalizeFile = function(file, mapResult, contents, zipFileID) {
     function getProgress(skipPercent) {
       return processed + " of " + fileSetMaxSize + " processed, " +
         skippedFiles + " skipped" + (!skipPercent ? " (" + percent + "%)" : '');
     }
+
+    function zipToFile(zipFileID, zipFileIDChanged) {
+      if (Object.keys(zip.files).length) {
+        status('Generating zip');
+        setTimeout( function(args) {
+          var zipFileID = args[0], zipIndex = args[1], zip = args[2];
+          var content = zip.generate({type:"blob"});
+          // see FileSaver.js
+          var zipFileName = zipFileID;
+          // var zipFileName = zipFileID;
+          if (zipIndex > 0) {
+            zipFileName += "-continued"+zipIndex;
+            // zipFileName = zipFileName + "-continuation"+zipIndex;
+          }
+          zipFileName += ".zip";
+          // zipFileName += ".zip";
+          saveAs(content, zipFileName);
+          // zipIndex += 1;
+          // zip = new JSZip();
+          status('Zip ' + zipFileName + ' completed -- ' + getProgress());
+        }, 0, [zipFileID, zipIndex, zip]);
+
+      if (zipFileIDChanged) {
+        zipIndex = 0;
+      }
+      else {
+        zipIndex += 1;
+      }
+      zip = new JSZip();
+
+      } else {
+        // everything was skipped
+        status('All skipped, no zip file created -- ' + getProgress(true));
+      }
+    };
 
     fileSet.delete(file);
     var processed = (fileSetMaxSize - fileSet.size);
@@ -270,6 +305,15 @@ $(function() {
     if (mapResult && mapResult.filePath) {
       var zipContents = new Uint8Array(contents);
       status(file.name + " became " + mapResult.filePath + " -- " + getProgress());
+
+      // if zipFileID changes, we need to save existing zip before continuing
+      if (zipFileID != prevZipFileID) {
+        // stow away what we have now
+        // (Note: 1st iteration calls this but that's ok, zipToFile skips empty sets)
+        zipToFile(prevZipFileID, true);
+        prevZipFileID = zipFileID;
+      }
+
       zip.file(mapResult.filePath, zipContents, {binary: true});
     } else {
       // if (many) skipped files
@@ -284,36 +328,13 @@ $(function() {
       mappingLog.push({filePath: file.name, log: "skipped"});
     }
 
-    var numFilesToZip = Object.keys(zip.files).length;
-    var zipFull = numFilesToZip >= options.maxFilesPerZip;
+    var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
 
     if (fileSet.size === 0 || zipFull) {
       // this check prevents empty datasets to be written (e.g. if all files skipped)
-      if (numFilesToZip) {
-        status('Generating zip');
-        setTimeout( function(args) {
-          var zipFileID = args[0], zipIndex = args[1];
-          var content = zip.generate({type:"blob"});
-          // see FileSaver.js
-          var zipFileName = "organizedDICOM.zip";
-          // var zipFileName = zipFileID;
-          if (zipIndex > 0) {
-            zipFileName = "organizedDICOM-continuation"+zipIndex+".zip";
-            // zipFileName = zipFileName + "-continuation"+zipIndex;
-          }
-          // zipFileName += ".zip";
-          saveAs(content, zipFileName);
-          zipIndex += 1;
-          zip = new JSZip();
-          status('Zip ' + zipFileName + ' completed -- ' + getProgress());
-        }, 0, [zipFileID, zipIndex]);
-      } else {
-        // everything was skipped
-        status('All skipped, no zip file created -- ' + getProgress(true));
-      }
+      zipToFile(zipFileID, false);
     }
   };
-
 
   // process one file from the input set.
   var organize = function(reader, file, filePath) {
@@ -397,6 +418,7 @@ $(function() {
     // Create a new zip archive
     zip = new JSZip();
     zipIndex = 0;
+    prevZipFileID = '';
     fileSetMaxSize = 0;
     mappingLog = [];
   }
@@ -625,7 +647,6 @@ $(function() {
           // - reset processing-related global variables
           // - print result to page
           $('.fileButtons').attr('disabled', false);
-          // zipIndex = 0;
           if (mappingLog.length > 0) {
             printToMainContext('Messages were generated during the mapping.  Download mapping log to view.');
             $('#downloadMappingLog').attr('disabled', false);
@@ -684,8 +705,9 @@ Main interface for data upload
     <div id="filepatterndiv"></div>
     <!-- CSV map file -->
     <div><p>Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
+    <div><p>Create one zip file per first <b>2</b> directory levels</p></div>
     <!-- Specific anon/mapping instructions -->
-    <div><p>Add specific anonymization instructions inside the editor</p></div>
+    <div><p>Add specific per-file anonymization instructions inside the editor</p></div>
     <div id="anonedit"></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>
