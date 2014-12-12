@@ -40,7 +40,7 @@ $(function() {
   /// globals
 
   var options = {
-    maxFilesPerZip : 10000,
+    maxFilesPerZip : 5000,
     // defaults for checkbox options
     mapOptions: {
       // set true to avoid removing private tags
@@ -266,22 +266,29 @@ $(function() {
       if (Object.keys(zip.files).length) {
         status('Generating zip');
         setTimeout( function(args) {
-          var zipFileID = args[0], zipIndex = args[1], zip = args[2];
+          var zipFileID = args[0], zipIndex = args[1], zip = args[2],
+            mappingLog = args[3];
           var content = zip.generate({type:"blob"});
-          // see FileSaver.js
-          var zipFileName = zipFileID;
-          // var zipFileName = zipFileID;
+
+          var fileName = zipFileID;
+          // var fileName = zipFileID;
           if (zipIndex > 0) {
-            zipFileName += "-continued"+zipIndex;
-            // zipFileName = zipFileName + "-continuation"+zipIndex;
+            fileName += "-continued"+zipIndex;
           }
-          zipFileName += ".zip";
-          // zipFileName += ".zip";
-          saveAs(content, zipFileName);
-          // zipIndex += 1;
-          // zip = new JSZip();
-          status('Zip ' + zipFileName + ' completed -- ' + getProgress());
-        }, 0, [zipFileID, zipIndex, zip]);
+          // see FileSaver.js
+          saveAs(content, fileName + ".zip");
+
+          // and save mappingLog at same extension
+          // first, save mappingLog
+          var logText = "";
+          $.each(mappingLog, function (index, logEntry) {
+            logText += logEntry.filePath + ": " + logEntry.log + "\n";
+          });
+          var logBlob = new Blob([logText], {type: "text/plain;charset=utf-8"});
+          saveAs(logBlob, fileName + ".txt");
+
+          status('Zip ' + fileName + '.zip completed -- ' + getProgress());
+        }, 0, [zipFileID, zipIndex, zip, mappingLog]);
 
       if (zipFileIDChanged) {
         zipIndex = 0;
@@ -290,6 +297,7 @@ $(function() {
         zipIndex += 1;
       }
       zip = new JSZip();
+      mappingLog = [];
 
       } else {
         // everything was skipped
