@@ -297,12 +297,19 @@ $(function() {
         zipIndex += 1;
       }
       zip = new JSZip();
-      mappingLog = [];
 
       } else {
         // everything was skipped
         status('All skipped, no zip file created -- ' + getProgress(true));
       }
+      // TODO: yes, if there were only skipped files, we're throwing the log about all 
+      // skipped files away here. It's better than the risk of crashing Chrome with
+      // too many log entries. In addition, the mappingLog currently has only filenames
+      // and no paths which makes it semi-useful. We would need to append the (old)
+      // path (mapped paths may not be available for skipped items, that's why they
+      // may have been skipped), and store the log - well separated from the others 
+      // because this one may contain private info.
+      mappingLog = [];
     };
 
     fileSet.delete(file);
@@ -655,12 +662,12 @@ $(function() {
           // - reset processing-related global variables
           // - print result to page
           $('.fileButtons').attr('disabled', false);
-          if (mappingLog.length > 0) {
-            printToMainContext('Messages were generated during the mapping.  Download mapping log to view.');
-            $('#downloadMappingLog').attr('disabled', false);
-          } else {
-            printToMainContext('No messages were generated during the mapping.');
-          }
+          // if (mappingLog.length > 0) {
+          //   printToMainContext('Messages were generated during the mapping.  Download mapping log to view.');
+          //   $('#downloadMappingLog').attr('disabled', false);
+          // } else {
+          //   printToMainContext('No messages were generated during the mapping.');
+          // }
         }
       };
     })(filePathObjects);
@@ -668,14 +675,14 @@ $(function() {
   });
 
   // get a text file of the current mapping log
-  $("#downloadMappingLog").click(function(){
-    var logText = "";
-    $.each(mappingLog, function (index, logEntry) {
-      logText += logEntry.filePath + ": " + logEntry.log + "\n";
-    });
-    var logBlob = new Blob([logText], {type: "text/plain;charset=utf-8"});
-    saveAs(logBlob, "mappingLog.txt");
-  });
+  // $("#downloadMappingLog").click(function(){
+  //   var logText = "";
+  //   $.each(mappingLog, function (index, logEntry) {
+  //     logText += logEntry.filePath + ": " + logEntry.log + "\n";
+  //   });
+  //   var logBlob = new Blob([logText], {type: "text/plain;charset=utf-8"});
+  //   saveAs(logBlob, "mappingLog.txt");
+  // });
 
 
   //  Override print so dcmjs commands will print to web page
@@ -713,7 +720,7 @@ Main interface for data upload
     <div id="filepatterndiv"></div>
     <!-- CSV map file -->
     <div><p>Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
-    <div><p>Create one zip file per first <b>2</b> directory levels</p></div>
+    <div><p>Create one zip file per first <b>2</b> output folder levels<small>(Todo: editable - logic done)</small></p></div>
     <!-- Specific anon/mapping instructions -->
     <div><p>Add specific per-file anonymization instructions inside the editor</p></div>
     <div id="anonedit"></div>
@@ -732,7 +739,8 @@ Main interface for data upload
       </div>
       <input type="BUTTON" class="fileButtons" id="processFiles" value="Process Files" disabled=true />
       <input type="BUTTON" class="fileButtons" id="clearFiles" value="Clear Files" disabled=true />
-      <input type="BUTTON" class="mappingLogButtons" id="downloadMappingLog" value="Download Mapping Log" disabled=true />
+      <!-- log is downloaded per fileset group -->
+      <!-- <input type="BUTTON" class="mappingLogButtons" id="downloadMappingLog" value="Download Mapping Log" disabled=true /> -->
     </div>
 
     <p id='status'>Waiting...</p>

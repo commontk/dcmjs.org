@@ -1,3 +1,8 @@
+// comments:
+// starting from CTP config but changing a few things.
+// Especially, looking at "*Time" tags, while time alone may not be critical,
+// we could develop a more consistent approach.
+
 var instanceUIDs = [
     "InstanceCreatorUID",
     "SOPInstanceUID",
