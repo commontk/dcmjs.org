@@ -87,7 +87,8 @@ $(function() {
 
   // the current pending set of files, as in what was
   // dropped or selected by the user (the input)
-  var fileSet = new Set();
+  // var fileSet = new Set();
+  var fileSet = 0;
   var fileSetMaxSize = 0;
   var skippedFiles = 0;
 
@@ -106,7 +107,7 @@ $(function() {
 
   // utility: todo: keep a log for optional download
   var print = function(s) {
-    console.log(s);
+    // console.log(s);
     // $('#main_content').append('<p class="output">%s</p>'.replace('%s', s));
   };
 
@@ -325,8 +326,10 @@ $(function() {
       mappingLog = [];
     };
 
-    fileSet.delete(file);
-    var processed = (fileSetMaxSize - fileSet.size);
+    // fileSet--;
+    // fileSet.delete(file);
+    var processed = (fileSetMaxSize - fileSet);
+    // var processed = (fileSetMaxSize - fileSet.size);
     var percent = Math.round((100 * processed) / fileSetMaxSize);
 
 
@@ -364,7 +367,8 @@ $(function() {
 
     var zipFull = Object.keys(zip.files).length >= options.maxFilesPerZip;
 
-    if (fileSet.size === 0 || zipFull) {
+    if (fileSet === 0 || zipFull) {
+    // if (fileSet.size === 0 || zipFull) {
       // this check prevents empty datasets to be written (e.g. if all files skipped)
       zipToFile(zipFileID, false);
     }
@@ -372,6 +376,7 @@ $(function() {
 
   // process one file from the input set.
   var organize = function(reader, file, filePath) {
+    fileSet--;
     // var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
     var rawFilePath = uploadedFilePath + '.0.raw';
@@ -435,7 +440,8 @@ $(function() {
   // Used for file selection button or drop of file list
   var readSelectedFiles = function(files) {
     $.each(files, function(index,file) {
-      fileSet.add(file);
+      fileSet++;
+      // fileSet.add(file);
       dcmjs.utils.readFile(file, organize);
     });
   };
@@ -549,16 +555,19 @@ $(function() {
       // chrome-only transfer that can include dropped directories
 
       var fileConsumer = function(file, fullPath) {
-        fileSet.add(file);
+        fileSet++;
+        // fileSet.add(file);
         filesByPath[fullPath] = file;
         filePathObjects.push({path: fullPath});
         file.filePath = fullPath;
-        fileSetMaxSize = fileSet.size;
+        fileSetMaxSize = fileSet;
+        // fileSetMaxSize = fileSet.size;
         status("found " + fileSetMaxSize + " files so far");
       };
 
       var doneCallback = function() {
-        fileSetMaxSize = fileSet.size;
+        fileSetMaxSize = fileSet;
+        // fileSetMaxSize = fileSet.size;
         if (filePathObjects.length < 1000) {
           $('#droppedFileList').jqGrid('addRowData', 0, filePathObjects);
         } else {
@@ -657,7 +666,8 @@ $(function() {
     $('#droppedFileList').jqGrid('clearGridData');
     $('.fileButtons').attr('disabled', true);
     $('.mappingLogButtons').attr('disabled', true);
-    fileSet.clear();
+    fileSet = 0;
+    // fileSet.clear();
     status('List cleared');
   });
 
@@ -666,10 +676,13 @@ $(function() {
     cleanupBeforeProcessing();
     $('.fileButtons').attr('disabled', true);
     $('.mappingLogButtons').attr('disabled', true);
-    fileSetMaxSize = fileSet.size;
+    fileSetMaxSize = fileSet;
+    // fileSetMaxSize = fileSet.size;
     var processingGenerator = (function(filePathObjects) {
       return function() {
         var filePathObject = filePathObjects.pop();
+        // FIXME: on folder based processing, check below could make exec go
+        // out of sync with fileSet by design - throw error instead?
         if (filePathObject && filePathObject.path) {
           // process one path
           var filePath = filePathObject.path;
