@@ -101,6 +101,7 @@ $(function() {
   // DICOM data (the output)
   var zip = new JSZip();
   var zipIndex = 0;
+  var zipFileIDs = {};
   var prevZipFileID = '';
 
   // utility: todo: keep a log for optional download
@@ -263,6 +264,18 @@ $(function() {
     }
 
     function zipToFile(zipFileID, zipFileIDChanged) {
+      // By experience directory hierarchies can be read by chrome out of sequence,
+      // but not much. It's possible for a directory to be processed in up to 3, 4
+      // turns (this is on a mac. TODO: check other platforms)
+      // therefore, first check whether zipFileID/zipIndex already exists, and if
+      // yes, increment zipIndex.
+      if (!zipFileIDs[zipFileID]) {
+        zipFileIDs[zipFileID] = 0;
+      } else {
+        zipFileIDs[zipFileID]++;
+        zipIndex = zipFileIDs[zipFileID];
+      }
+
       if (Object.keys(zip.files).length) {
         status('Generating zip');
         setTimeout( function(args) {
@@ -285,7 +298,7 @@ $(function() {
             logText += logEntry.filePath + ": " + logEntry.log + "\n";
           });
           var logBlob = new Blob([logText], {type: "text/plain;charset=utf-8"});
-          saveAs(logBlob, fileName + ".txt");
+          saveAs(logBlob, fileName + ".log");
 
           status('Zip ' + fileName + '.zip completed -- ' + getProgress());
         }, 0, [zipFileID, zipIndex, zip, mappingLog]);
@@ -329,6 +342,9 @@ $(function() {
         prevZipFileID = zipFileID;
       }
 
+      // FIXME: is it possible to store two files with same path in the zip object?
+      // If so, ensure that can't happen, otherwise the user might provide a
+      // filepath pattern that's not sufficient to ensure uniqueness across instances
       zip.file(mapResult.filePath, zipContents, {binary: true});
     } else {
       // if (many) skipped files
@@ -353,7 +369,7 @@ $(function() {
 
   // process one file from the input set.
   var organize = function(reader, file, filePath) {
-    var fileName = file.name;
+    // var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
     var rawFilePath = uploadedFilePath + '.0.raw';
     var organizedXMLFilePath = '/organizedObject.xml';
@@ -547,7 +563,7 @@ $(function() {
         }
         status(fileSetMaxSize + " files found for processing");
         $('.fileButtons').attr('disabled', false);
-      }
+      };
 
       var entriesToProcess = [];  // a list of all the entries to process
       for (var i = 0; i < length; i++) {
