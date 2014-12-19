@@ -358,8 +358,9 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
     });
 
     // find new path:
-    var newFilePath = "/" + cleanFilePath(specificReplace.filePath).join("/");
-    var zipFileID = specificReplace.filePath.slice(0, zipGroupLevel).join("__");
+    var cleanedFileComps = cleanFilePath(specificReplace.filePath);
+    var newFilePath = "/" + cleanedFileComps.join("/");
+    var zipFileID = cleanedFileComps.slice(0, zipGroupLevel).join("__");
 
     applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);
 

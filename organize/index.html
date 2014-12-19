@@ -313,7 +313,7 @@ $(function() {
 
       } else {
         // everything was skipped
-        status('All skipped, no zip file created -- ' + getProgress(true));
+        status('Last files skipped, no additional zip file created -- ' + getProgress(true));
       }
       // TODO: yes, if there were only skipped files, we're throwing the log about all 
       // skipped files away here. It's better than the risk of crashing Chrome with
@@ -330,17 +330,20 @@ $(function() {
     var percent = Math.round((100 * processed) / fileSetMaxSize);
 
 
+    // if zipFileID changes, we need to save existing zip before continuing
+    // NOTE: slightly dirty because zipFileID can be undefined if non-DICOM is skipped.
+    // But works. We need this outside the check for .filePath, because valid zip needs
+    // to be saved on first non-DICOM file appearance
+    if (zipFileID != prevZipFileID) {
+      // stow away what we have now
+      // (Note: 1st iteration calls this but that's ok, zipToFile skips empty sets)
+      zipToFile(prevZipFileID, true);
+      prevZipFileID = zipFileID;
+    }
+
     if (mapResult && mapResult.filePath) {
       var zipContents = new Uint8Array(contents);
       status(file.name + " became " + mapResult.filePath + " -- " + getProgress());
-
-      // if zipFileID changes, we need to save existing zip before continuing
-      if (zipFileID != prevZipFileID) {
-        // stow away what we have now
-        // (Note: 1st iteration calls this but that's ok, zipToFile skips empty sets)
-        zipToFile(prevZipFileID, true);
-        prevZipFileID = zipFileID;
-      }
 
       // FIXME: is it possible to store two files with same path in the zip object?
       // If so, ensure that can't happen, otherwise the user might provide a
