@@ -270,7 +270,7 @@ $(function() {
       // turns (this is on a mac. TODO: check other platforms)
       // therefore, first check whether zipFileID/zipIndex already exists, and if
       // yes, increment zipIndex.
-      if (!zipFileIDs[zipFileID]) {
+      if (typeof zipFileIDs[zipFileID] == 'undefined') {
         zipFileIDs[zipFileID] = 0;
       } else {
         zipFileIDs[zipFileID]++;
