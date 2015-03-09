@@ -5,11 +5,6 @@
 
 // NOTE: not writing into options.status because of performance reasons
 
-
-// this number describes how many path components (of the PROCESSED file path) are grouped
-// in a single zip file. The zip files are labeled according to the grouping.
-var zipGroupLevel = 2;
-
 // from mapdefaults.js
 var defaultEmpty = tagNamesToEmpty;
 var replaceUIDs = instanceUIDs;
@@ -25,8 +20,7 @@ var startConfigs = {
     "filePath = [\n" +
     "    parser.getDicom('PatientName'),\n" +
     "    parser.getDicom('Modality'),\n" +
-    "    parser.getDicom('StudyDescription'),\n" +
-    "    parser.getDicom('StudyDate'),\n" +
+    "    parser.getDicom('StudyDate') + '_' + parser.getDicom('StudyDescription'),\n" +
     "    parser.getDicom('SeriesNumber'),\n" +
     "    parser.getDicom('SeriesDescription') + '_' + parser.getDicom('SeriesNumber'),\n" +
     "    parser.getDicom('InstanceNumber') + '.dcm'\n" +
@@ -379,7 +373,7 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
     // find new path:
     var cleanedFileComps = cleanFilePath(specificReplace.filePath);
     var newFilePath = "/" + cleanedFileComps.join("/");
-    var zipFileID = cleanedFileComps.slice(0, zipGroupLevel).join("__");
+    var zipFileID = cleanedFileComps.slice(0, options.zipGroupLevel).join("__");
 
     if (!options.mapOptions.noAnonymization) {
         applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);

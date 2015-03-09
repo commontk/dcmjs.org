@@ -59,7 +59,10 @@ $(function() {
     },
     // maybe even present the user the file path of first
     // dicom found and ask them to enter this string below?
-    filePathPattern: 'trialname/centersubj/dicomstudyid/dicomseriesid/'
+    filePathPattern: 'trialname/centersubj/dicomstudyid/dicomseriesid/',
+    // this number describes how many path components (of the PROCESSED file path) are grouped
+    // in a single zip file. The zip files are labeled according to the grouping.
+    zipGroupLevel: 2
   };
 
   // set up and link checkboxes to mapOptions dict
@@ -86,6 +89,14 @@ $(function() {
   filePatternInp.appendTo(filePatternDiv);
   filePatternInp.on('keyup change', function() {
     options.filePathPattern = filePatternInp.val();
+  });
+
+  // allow changing zipGroupLevel
+  var $zipGrInp = $('#zipGrL');
+  // set input to value first time:
+  $zipGrInp.val(options.zipGroupLevel);
+  $zipGrInp.change(function() {
+    options.zipGroupLevel = $(this).val();
   });
 
   // the current pending set of files, as in what was
@@ -355,15 +366,13 @@ $(function() {
       // If so, ensure that can't happen, otherwise the user might provide a
       // filepath pattern that's not sufficient to ensure uniqueness across instances
       zip.file(mapResult.filePath, zipContents, {binary: true});
+      if (mapResult.status.log.length > 0) {
+        mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log});
+      }
     } else {
       // if (many) skipped files
       skippedFiles++;
       status(file.name + " skipped -- " + getProgress());
-    }
-
-    if (mapResult && mapResult.status.log.length > 0) {
-      mappingLog.push({filePath: mapResult.filePath, log: mapResult.status.log});
-    } else {
       // TODO - better args to func so full path can be shown
       mappingLog.push({filePath: file.name, log: "skipped"});
     }
@@ -403,7 +412,8 @@ $(function() {
                     print: print,
                     status: status,
                     mapOptions: options.mapOptions,
-                    filePathPattern: options.filePathPattern
+                    filePathPattern: options.filePathPattern,
+                    zipGroupLevel: options.zipGroupLevel
                   });
 
       if (!options.mapOptions.keepMappingFailures && result.status.mapFailed) {
@@ -747,7 +757,7 @@ $(function() {
   <div class="container">
     <h1>dcmjs organize</h1>
     <h2>Organize and anonymize dicom files in your browser (they are not sent to a server)</h2>
-    <h2>NOTE: this is not yet ready for routine use!</h2>
+    <h2>Find an issue? Please let us know <a href="https://github.com/commontk/dcmjs.org/issues">here!</a></h2>
   </div>
 </header>
 
@@ -763,10 +773,12 @@ Main interface for data upload
     <div id="checkboxes"></div>
     <div id="filepatterndiv"></div>
     <!-- CSV map file -->
-    <div><p>Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
-    <div><p>Create one zip file per first <b>2</b> output folder levels<small>(Todo: editable - logic done)</small></p></div>
+    <div><p>Optional: Browse for CSV mapping file <small>(comma separated and with headers!)</small></p><input type="file" id="csvfiles" name="csvfiles[]" multiple /></div>
+    <div>
+      <p>Create one zip file per top <input id='zipGrL' type='text' size='1'/> output folder levels</p>
+    <div>
     <!-- Specific anon/mapping instructions -->
-    <div><p>Add specific per-file anonymization instructions inside the editor</p></div>
+    <div><p>Finally, add specific per-file anonymization instructions in the editor</p></div>
     <div>
       <span>Choose a start config:</span>
       <label><input type="radio" name="sortconfig" value="cfDicomSort"/>simple dicom sort</label>
