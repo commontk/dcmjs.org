@@ -36,11 +36,12 @@ var instanceUIDs = [
 ];
 
 var tagNamesToEmpty = [
-    // 0/3: seems to be missing in CTP
-    "SeriesDate",
     // please override these in specificReplaceDefaults to have useful values
     "PatientID",
     "PatientName",
+
+    // 0/3: those that appear missing in CTP
+    "SeriesDate",
     "AccessionNumber",
     // (valuable, but sometimes manually filled)
     "SeriesDescription",

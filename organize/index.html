@@ -43,6 +43,7 @@ $(function() {
     maxFilesPerZip : 5000,
     // defaults for checkbox options
     mapOptions: {
+      noAnonymization: false,
       // set true to avoid removing private tags
       keepPrivateTags: false,
       // set true for strict tag removal:
@@ -52,6 +53,8 @@ $(function() {
       // the default is false because files failing mapping instructions can leak private
       // information. (and if no mapping is specified in editor, this is not relevant)
       keepMappingFailures: false,
+      // whether or not to fail if input file is not as deeply nested as required by
+      // the queried folder component
       requireDirectoryMatch: false
     },
     // maybe even present the user the file path of first
@@ -519,7 +522,7 @@ $(function() {
   // END Dealing with mapping CSVs
 
   // START EDITOR TO ENTER SPECIFIC INSTRUCTIONS
-  var specificMapConfigs = specificMappingExample;
+  var specificMapConfigs = "// Start by choosing one of the configs above";
 
   var anonEditor = ace.edit(anonedit);
   anonEditor.setValue(specificMapConfigs, 1);
@@ -533,6 +536,15 @@ $(function() {
   anonEditor.getSession().on('change', function(e) {
       specificMapConfigs = anonEditor.getValue();
   });
+  $('input:radio[name="sortconfig"]').change(
+    function(){
+        var $this = $(this);
+        if ($this.is(':checked')) {
+          // set editor content from selector name
+          // editor change listener will do the rest
+          anonEditor.setValue(startConfigs[$this.val()], 1);
+        }
+    });
   // END EDITOR TO ENTER SPECIFIC INSTRUCTIONS
 
 
@@ -755,6 +767,11 @@ Main interface for data upload
     <div><p>Create one zip file per first <b>2</b> output folder levels<small>(Todo: editable - logic done)</small></p></div>
     <!-- Specific anon/mapping instructions -->
     <div><p>Add specific per-file anonymization instructions inside the editor</p></div>
+    <div>
+      <span>Choose a start config:</span>
+      <label><input type="radio" name="sortconfig" value="cfDicomSort"/>simple dicom sort</label>
+      <label><input type="radio" name="sortconfig" value="cfFullExample"/>full example</label>
+    </div>
     <div id="anonedit"></div>
     <!-- File selector -->
     <p>Browse for DICOM files:</p>

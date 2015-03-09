@@ -14,39 +14,57 @@ var zipGroupLevel = 2;
 var defaultEmpty = tagNamesToEmpty;
 var replaceUIDs = instanceUIDs;
 
-var specificMappingExample = "dicom = {\n" +
-"// List DICOM Header tags for which you want to change values:\n" +
-"// It's important to assign something to PatientName and PatientID as otherwise\n" +
-"// they will just get emptied by the default behaviour\n" +
-"    'PatientName': function() {\n" +
-"        // set to a static value\n" +
-"        // return 'myID';\n" +
-"        // OR set to header value of same DICOM instance\n" +
-"        // return parser.getDicom('PatientID')\n" +
-"        // OR set to a component of the files directory path\n" +
-"        return parser.getFilePathComp('centersubj');\n" +
-"    },\n" +
-"    // this example replaces the patient name per mapping table column labeled 'CURR_ID' (original)\n" +
-"    // and 'NEW_ID' (target)\n" +
-"    'PatientID': function() {\n" +
-"        return parser.getMapping(parser.getDicom('PatientID'), 'CURR_ID', 'NEW_ID');\n" +
-"    },\n" +
-"    // this example finds the patientname in mapping table column 0 and offsets the CONTENTDATE by days per column 2\n" +
-"    'ContentDate': function() {\n" +
-"        return parser.addDays(parser.getDicom('StudyDate'), parser.getMapping(\n" + 
-"            parser.getDicom('PatientID'), 'CURR_ID', 'DATE_OFFSET'));\n" +
-"    },\n" +
-"};\n" +
-"// filePath lists the components of the new path to be written.\n" +
-"// If taken from old path, component names must be available in filePathPattern,\n" +
-"// and actual file path must be deep enough for getFilePathComp to find its match\n" +
-"filePath = [\n" +
-"    parser.getFilePathComp('trialname'),\n" +
-"    parser.getFilePathComp('centersubj') + '_OR_' + parser.getDicom('PatientID'),\n" +
-"    parser.getDicom('StudyDate'),\n" +
-"    parser.getDicom('SeriesDescription') + '_' + parser.getDicom('SeriesNumber'),\n" +
-"    parser.getDicom('InstanceNumber') + '.dcm'\n" +
-"];";
+var startConfigs = {
+    cfDicomSort:
+    "// Basic dicom sort:\n" +
+    "// This config just sorts images based on dicom header info.\n" +
+    "// USE WITH 'noAnonymization' flag!\n" +
+    "dicom = {\n" +
+    "" +
+    "};\n" +
+    "filePath = [\n" +
+    "    parser.getDicom('PatientName'),\n" +
+    "    parser.getDicom('Modality'),\n" +
+    "    parser.getDicom('StudyDescription'),\n" +
+    "    parser.getDicom('StudyDate'),\n" +
+    "    parser.getDicom('SeriesNumber'),\n" +
+    "    parser.getDicom('SeriesDescription') + '_' + parser.getDicom('SeriesNumber'),\n" +
+    "    parser.getDicom('InstanceNumber') + '.dcm'\n" +
+    "];",
+    cfFullExample: "dicom = {\n" +
+    "// List DICOM Header tags for which you want to change values:\n" +
+    "// It's important to assign something to PatientName and PatientID as otherwise\n" +
+    "// they will just get emptied by the default behaviour\n" +
+    "    'PatientName': function() {\n" +
+    "        // set to a static value\n" +
+    "        // return 'myID';\n" +
+    "        // OR set to header value of same DICOM instance\n" +
+    "        // return parser.getDicom('PatientID')\n" +
+    "        // OR set to a component of the files directory path\n" +
+    "        return parser.getFilePathComp('centersubj');\n" +
+    "    },\n" +
+    "    // this example replaces the patient name per mapping table column labeled 'CURR_ID' (original)\n" +
+    "    // and 'NEW_ID' (target)\n" +
+    "    'PatientID': function() {\n" +
+    "        return parser.getMapping(parser.getDicom('PatientID'), 'CURR_ID', 'NEW_ID');\n" +
+    "    },\n" +
+    "    // this example finds the patientname in mapping table column 0 and offsets the CONTENTDATE by days per column 2\n" +
+    "    'ContentDate': function() {\n" +
+    "        return parser.addDays(parser.getDicom('StudyDate'), parser.getMapping(\n" + 
+    "            parser.getDicom('PatientID'), 'CURR_ID', 'DATE_OFFSET'));\n" +
+    "    },\n" +
+    "};\n" +
+    "// filePath lists the components of the new path to be written.\n" +
+    "// If taken from old path, component names must be available in filePathPattern,\n" +
+    "// and actual file path must be deep enough for getFilePathComp to find its match\n" +
+    "filePath = [\n" +
+    "    parser.getFilePathComp('trialname'),\n" +
+    "    parser.getFilePathComp('centersubj') + '_OR_' + parser.getDicom('PatientID'),\n" +
+    "    parser.getDicom('StudyDate'),\n" +
+    "    parser.getDicom('SeriesDescription') + '_' + parser.getDicom('SeriesNumber'),\n" +
+    "    parser.getDicom('InstanceNumber') + '.dcm'\n" +
+    "];"
+};
 
 
 
@@ -336,8 +354,10 @@ var removeNonWhitelistedTags = function(jQDom, whiteListTags, specialTags, insta
 // read from old dicom dom and write to new dicomdom
 var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, options) {
     var status = {log: [], mapFailed: false};
+    // TODO: we can probably get rid of this default setting action. options.mapOptions undefined
+    // would be a problem anyway
     options = options || {};
-    ['requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
+    ['noAnonymization', 'requireDirectoryMatch', 'keepWhitelistedTagsOnly', 'keepPrivateTags']
             .forEach(function(optName) {
         if (typeof options.mapOptions[optName] == 'undefined') options.mapOptions[optName] = false;
     });
@@ -346,7 +366,6 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
     var $oldDicomDOM = $($.parseXML(xmlString));
     var $newDicomDOM = $($.parseXML(xmlString));
 
-    // TODO: define filePath - should come in arguments
     var parser = getParser($oldDicomDOM, csvMappingTable, filePath, options, status);
     var specificReplace = getSpecificReplacer(parser, specificMapConfigs);
 
@@ -362,10 +381,12 @@ var mapDom = function(xmlString, filePath, csvMappingTable, specificMapConfigs, 
     var newFilePath = "/" + cleanedFileComps.join("/");
     var zipFileID = cleanedFileComps.slice(0, zipGroupLevel).join("__");
 
-    applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);
+    if (!options.mapOptions.noAnonymization) {
+        applyReplaceDefaults($newDicomDOM, specificReplace, parser, options, status);
 
-    if (!options.mapOptions.keepPrivateTags) {
-        removePrivateTags($newDicomDOM);
+        if (!options.mapOptions.keepPrivateTags) {
+            removePrivateTags($newDicomDOM);
+        }
     }
 
     if (options.mapOptions.keepWhitelistedTagsOnly) {
