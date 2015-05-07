@@ -85,7 +85,7 @@ $(function() {
   var filePatternInp = $('<input/>', {type: 'text', id: 'filepattern',
     value: options.filePathPattern});
   filePatternInp.prop('size', 70);
-  $('<label/>', { 'for': 'filepattern', text: 'folder pattern: /'}).appendTo(filePatternDiv);
+  $('<label/>', { 'for': 'filepattern', text: 'incoming folder pattern: /'}).appendTo(filePatternDiv);
   filePatternInp.appendTo(filePatternDiv);
   filePatternInp.on('keyup change', function() {
     options.filePathPattern = filePatternInp.val();
