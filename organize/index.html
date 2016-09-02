@@ -45,7 +45,7 @@ $(function() {
     mapOptions: {
       noAnonymization: false,
       // set true to avoid removing private tags
-      keepPrivateTags: false,
+      // keepPrivateTags: false,
       // set true for strict tag removal:
       // remove everything in header except what dcmjs.org has as a whitelist
       keepWhitelistedTagsOnly: false,
@@ -79,6 +79,10 @@ $(function() {
           options.mapOptions[optName] = chbox.prop('checked');
         });
   });
+
+  // TODO: move private tag choice back up when enabled. For now, it's hard-coded, always.
+  options.mapOptions.keepPrivateTags = false;
+  boxesDiv.append($('<div>').append($('<p>').append('This tool *always* removes private tags for now.')));
 
   // allow editing of filepath pattern
   var filePatternDiv = $('#filepatterndiv');
@@ -152,21 +156,29 @@ $(function() {
 
   // returns xml string from dcmdump output string
   var dumpToXML = function(dumpLines) {
+    function isPrivate(tag) {
+      return (Number("0x"+tag[3]) % 2 === 1);
+    }
+
     var xml = '';
     xml += '<?xml version="1.0" encoding="ISO-8859-1"?>\n';
     xml += '<file-format>\n';
     xml += '<meta-header xfer="1.2.840.10008.1.2.1" name="Little Endian Explicit">\n';
 
+    var insideTopPrivateSq = false;
     $.each(dumpLines, function (index, line) {
+      // Are we inside a sequence (or non-element entry)?
+      var insideSq = line[0] !== '(';
       // map to xml depending on the syntax of dcmdump
       // TODO: this could be improved with a dedicated dcmtk utility
       line = line.trim();  // remove spaces (indent)
       if (line.length === 0) { return; }; // skip blank lines
-      if (line.search('Unknown Tag & Data') != -1) {
-        // skip privates
-        // TODO: better way to handle unknown private data?
-        return;
-      }
+      // That's bad because it keeps stale item & sq delimiters.
+      // if (line.search('Unknown Tag & Data') != -1) {
+      //   // skip privates
+      //   // TODO: better way to handle unknown private data?
+      //   return;
+      // }
       line = line.replace('&', '&amp'); // escape special characters
       if (line.search('# Dicom-Data-Set') != -1) {
         // special flag for start of dataset
@@ -178,12 +190,39 @@ $(function() {
       if (line[0] === '(') {
         // parse components of a real entry
         var parts = line.split(' ');
-        var tag = parts[0].substring(1,10); // first "(gggg,eeee)"
+        var tag = parts[0].substring(1,10); // first "gggg,eeee"
         var vr = parts[1];
         var vm = parts[parts.length-2];
         var len = parts[parts.length-3];
         len = len.substring(0,len.length-1);
         var name = parts[parts.length-1];
+
+        // This is a fix for private sequences that will otherwise leave stray delimiters behind.
+        // TODO: Private tags should not be removed here, or they should be added back later if desired.
+
+        // Skip private tags.
+        if (isPrivate(tag)) {
+          // Are we starting a private sequence? Indicate before skipping.
+          if (!insideSq && vr === 'SQ') {
+            insideTopPrivateSq = true;
+          }
+          return;
+        }
+
+        // Have we been inside a private top level SQ before?
+        if (insideTopPrivateSq) {
+          // Are we still inside? Skip.
+          if (insideSq) {
+            return;
+          } else {
+            // Ending a private sequence - skip delimiter.
+            insideTopPrivateSq = false;
+            // Return if it's a SQ delim item (sanity check).
+            if (tag === 'fffe,e0dd') {
+              return;
+            }
+          }
+        }
 
         var value = '';
         if (vr === '??') { vr = "UN"; }
