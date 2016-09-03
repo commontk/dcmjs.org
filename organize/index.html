@@ -277,6 +277,9 @@ $(function() {
 
     status('returnCode', returnCode); // TODO
 
+    // The check below kind of works, but if the dataset has multiple pixeldata,
+    // dcmdump will store them in consequtive names (".N.raw") and this may
+    // not be a sufficient check.
     var rawFilePath = filePath + ".0.raw";
     if (!dcmjs.utils.fileExists(rawFilePath)) {
       return null;
@@ -297,13 +300,14 @@ $(function() {
       // TODO: move pixel data handling to the mapper
       var pixelData = (tag === "7fe0,0010");
 
-      if (pixelData) {
-        // FIXME: special case based on known file names
-        dump += '(7fe0,0010) OW =./uploadedFile.dcm.0.raw\n';
-      } else {
-        var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
-        dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
-      }
+      // NOTE: For pixelData, this only works if the mapper does nothing to it.
+      // That would be kind of expected behaviour though.
+      // NOTE2: We shouldn't hard-code pixelData assignment to a file here, as dicomdump
+      // creates multiple values for multiple elements.
+      // The only possible hack would be to auto-increment a N starting at 0 and use
+      // '.N.raw' suffix for every pixelData.
+      var bracketed = nonBracketDumpedVRs.indexOf(vr) === -1;
+      dump += '(' + tag + ') ' + vr + ' ' + (bracketed ? '[':'') + value + (bracketed ? ']':'') + '\n';
     });
     return(dump);
   };
@@ -434,6 +438,8 @@ $(function() {
     var organizedXMLFilePath = '/organizedObject.xml';
     var organizedDICOMFilePath = '/organizedObject.dcm';
 
+    // FIXME: this does NOT delete all rawFilePaths if dcmdump has created
+    // multiple ('.N.raw')
     // Delete anything left from previous runs
     dcmjs.utils.deleteFiles([uploadedFilePath, rawFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
 
