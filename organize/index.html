@@ -280,10 +280,11 @@ $(function() {
     // The check below kind of works, but if the dataset has multiple pixeldata,
     // dcmdump will store them in consequtive names (".N.raw") and this may
     // not be a sufficient check.
-    var rawFilePath = filePath + ".0.raw";
-    if (!dcmjs.utils.fileExists(rawFilePath)) {
-      return null;
-    }
+    // For now, comment out as that may gain us speed.
+    // var rawFilePath = filePath + ".0.raw";
+    // if (!dcmjs.utils.fileExists(rawFilePath)) {
+    //   return null;
+    // }
 
     return (dumpToXML(dumpLines));
   };
@@ -431,17 +432,23 @@ $(function() {
 
   // process one file from the input set.
   var organize = function(reader, file, filePath) {
+    function findRawFileExts(dump) {
+      // return dump.match(/\/uploadedFile.dcm.\d.raw/g);
+      return dump.match(/\.\d\.raw/g);
+    }
+
     fileSet--;
     // var fileName = file.name;
     var uploadedFilePath = '/uploadedFile.dcm';
-    var rawFilePath = uploadedFilePath + '.0.raw';
+    // var rawFilePath = uploadedFilePath + '.0.raw';
     var organizedXMLFilePath = '/organizedObject.xml';
     var organizedDICOMFilePath = '/organizedObject.dcm';
 
     // FIXME: this does NOT delete all rawFilePaths if dcmdump has created
     // multiple ('.N.raw')
     // Delete anything left from previous runs
-    dcmjs.utils.deleteFiles([uploadedFilePath, rawFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
+    // dcmjs.utils.deleteFiles([uploadedFilePath, rawFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
+    dcmjs.utils.deleteFiles([uploadedFilePath, organizedXMLFilePath, organizedDICOMFilePath]);
 
     status('Writing...');
     var uploadedObject = new Int8Array(reader.result);
@@ -450,9 +457,15 @@ $(function() {
     var xmlString = xmlFromDICOM(file, uploadedFilePath);
 
     if (xmlString !== null) {
-      var saveFile = true;
-
-      var mapFile;
+      /*
+       * result.dicom
+       * result.status.mapFailed = true if no corresponding value found in mapping table
+       * result.status.filePathFailed = true if input file path didn't match
+       *     expected file path pattern
+       * result.filePath (new file path)
+       * result.zipFileID
+       * result.status.log
+       */
       var result = mapDom(xmlString, filePath, csvMappingTable, specificMapConfigs, {
                     print: print,
                     status: status,
@@ -468,13 +481,6 @@ $(function() {
         finalizeFile(file, undefined, undefined, undefined);
       } else {
         var $newDicomDOM = result.dicom;
-        // new information available here:
-        // result.status.mapFailed = true if no corresponding value found in mapping table
-        // result.status.filePathFailed = true if input file path didn't match
-        //     expected file path pattern
-        // result.filePath (new file path)
-        // result.zipFileID
-        // result.status.log
 
         // convert to dump and save
         var dump = dicomDOMToDump($newDicomDOM);
@@ -483,6 +489,11 @@ $(function() {
         // perform the dump to dcm
         dcmjs.utils.execute('dump2dcm', ['--ignore-errors', "./dump.txt", organizedDICOMFilePath]);
         var organizedObject = FS.readFile(organizedDICOMFilePath, {encoding: 'binary'} );
+
+        // Remove additional ".N.raw" files. Doing that here to minimize impact on existing code which
+        // needs to be completely restructured anyway.
+        var rawFilePaths = findRawFileExts(dump).map(function(ext) { return uploadedFilePath + ext; });
+        dcmjs.utils.deleteFiles(rawFilePaths);
 
         status(result.filePath + "  of size " + organizedObject.length);
         finalizeFile(file, result, organizedObject, result.zipFileID);
