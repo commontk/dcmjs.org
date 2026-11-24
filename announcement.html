@@ -59,7 +59,8 @@
                 names as dcmjs 0.52, so most projects change only the import
                 line. The largest change is in naturalization: it no longer uses
                 a Proxy, and the VM of the DICOM dictionary decides the shape of
-                each value. A single-item sequence is now the item object, a VM
+                each value. A single-item sequence is now the item object (a
+                single person name follows the same rule), a VM
                 <code>1-n</code> attribute such as <code>ImageType</code> or
                 <code>WindowCenter</code> stays a list even with one value, and
                 private elements are grouped by their private creator block.
@@ -82,6 +83,47 @@
                 >
                 give the details.
             </p>
+            <p>
+                The
+                <a
+                    href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/README.md"
+                    >codemods</a
+                >
+                give the upgrade as a list of code changes. A person, an AI
+                agent or a <code>jscodeshift</code> transform can apply each
+                one. Each codemod gives the code patterns to find, the rewrite,
+                and the cases that need a person to decide.
+            </p>
+            <ul>
+                <li>
+                    Phase 1 keeps the 0.x calls:
+                    <a
+                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/01-package-name.md"
+                        >CM-1</a
+                    >
+                    changes the package name to <code>@dcmjs-org/dcmjs</code>,
+                    and
+                    <a
+                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/02-naturalized-values.md"
+                        >CM-2</a
+                    >
+                    adapts the code to the naturalized values of 1.0.
+                </li>
+                <li>
+                    Phase 2 is optional, and uses the streaming reader and
+                    writer:
+                    <a
+                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/03-async-read.md"
+                        >CM-3</a
+                    >
+                    reads Part 10 directly to a naturalized dataset, and
+                    <a
+                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/04-async-write.md"
+                        >CM-4</a
+                    >
+                    writes a naturalized dataset directly to Part 10.
+                </li>
+            </ul>
 
             <h2>From the beta to the release</h2>
             <p>
