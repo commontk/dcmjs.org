@@ -86,42 +86,37 @@
             <p>
                 The
                 <a
-                    href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/README.md"
-                    >codemods</a
+                    href="https://github.com/dcmjs-org/dcmjs/tree/master/packages/codemods"
+                    >dcmjs codemods</a
                 >
-                give the upgrade as a list of code changes. A person, an AI
-                agent or a <code>jscodeshift</code> transform can apply each
-                one. Each codemod gives the code patterns to find, the rewrite,
-                and the cases that need a person to decide.
+                do the mechanical part of the upgrade, and report each site
+                that needs a person:
             </p>
+            <pre><code>npx codemod @dcmjs-org/dcmjs-1 --dry-run</code></pre>
             <ul>
                 <li>
-                    Phase 1 keeps the 0.x calls:
                     <a
-                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/01-package-name.md"
-                        >CM-1</a
+                        href="https://github.com/dcmjs-org/dcmjs/tree/master/packages/codemods/registry/dcmjs/1/package-name"
+                        ><code>@dcmjs-org/dcmjs-1-package-name</code></a
                     >
-                    changes the package name to <code>@dcmjs-org/dcmjs</code>,
-                    and
+                    changes the dependency and the module name to
+                    <code>@dcmjs-org/dcmjs</code>.
+                </li>
+                <li>
                     <a
-                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/02-naturalized-values.md"
-                        >CM-2</a
+                        href="https://github.com/dcmjs-org/dcmjs/tree/master/packages/codemods/registry/dcmjs/1/naturalized-values"
+                        ><code>@dcmjs-org/dcmjs-1-naturalized-values</code></a
                     >
                     adapts the code to the naturalized values of 1.0.
                 </li>
                 <li>
-                    Phase 2 is optional, and uses the streaming reader and
-                    writer:
                     <a
-                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/03-async-read.md"
-                        >CM-3</a
+                        href="https://github.com/dcmjs-org/dcmjs/tree/master/packages/codemods/registry/dcmjs/1/event-stream"
+                        ><code>@dcmjs-org/dcmjs-1-event-stream</code></a
                     >
-                    reads Part 10 directly to a naturalized dataset, and
-                    <a
-                        href="https://github.com/dcmjs-org/dcmjs/blob/master/docs/codemods/04-async-write.md"
-                        >CM-4</a
-                    >
-                    writes a naturalized dataset directly to Part 10.
+                    is optional. It reads Part 10 directly to a naturalized
+                    dataset, and writes a naturalized dataset directly to Part
+                    10, with the streaming reader and writer.
                 </li>
             </ul>
 
